@@ -1,41 +1,19 @@
 #include "host_keyboard.h"
 
-#if defined(USE_LEGACY_HID_API)
-
 // ===========================================================================
-// Legacy path: Arduino AVR core <= 1.6.5
+// Raw USB keyboard output for the Arduino AVR core (PluggableUSB).
 // ---------------------------------------------------------------------------
-// These cores exposed a global raw-report sender and shipped a built-in HID
-// report descriptor in which report id 2 is the boot keyboard, so there is
-// nothing to set up -- we just forward to the original function.
-// ===========================================================================
-
-#include <USBAPI.h>
-
-void HostKeyboardBegin() {}
-
-void SendKeyReport(uint8_t buf[8]) {
-    HID_SendReport(2, buf, 8);
-}
-
-#else
-
-// ===========================================================================
-// Modern path: Arduino AVR core >= 1.6.6 (PluggableUSB)
-// ---------------------------------------------------------------------------
-// HID_SendReport() is gone. Raw reports now go through the HID() singleton,
-// but unlike the old core it ships with NO descriptor, so the host would not
-// recognise us as a keyboard. We register our own boot-keyboard descriptor
-// (report id 2 -- identical to the one the old core hard-coded) and then send
-// raw reports through HID().SendReport(2, ...). Both the old free function and
-// SendReport() prepend the report-id byte and then emit the payload verbatim,
-// so this is wire-for-wire identical to the original code.
+// The modal-keys engine works directly on raw 8-byte HID boot-keyboard reports
+// and needs positional write access to the wire buffer. The core's
+// PluggableUSB HID() singleton can send raw reports via SendReport(id, ...),
+// but it ships with no descriptor, so the host would not recognise us as a
+// keyboard. We register our own boot-keyboard descriptor (report id 2) and then
+// send raw reports through HID().SendReport(2, buf, 8).
 // ===========================================================================
 
 #include <HID.h>
 
-// Standard 8-byte boot-keyboard report descriptor, report id 2. Copied from
-// the keyboard collection the pre-1.6.6 AVR core hard-coded in HID.cpp.
+// Standard 8-byte boot-keyboard report descriptor, report id 2.
 static const uint8_t _bootKeyboardDescriptor[] PROGMEM = {
     0x05, 0x01,  // USAGE_PAGE (Generic Desktop)
     0x09, 0x06,  // USAGE (Keyboard)
@@ -71,5 +49,3 @@ void HostKeyboardBegin() {
 void SendKeyReport(uint8_t buf[8]) {
     HID().SendReport(2, buf, 8);
 }
-
-#endif

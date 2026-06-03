@@ -16,12 +16,10 @@
 // `Keyboard` library only exposes press()/release()/write() over its own
 // private report buffer and gives no positional access to the wire bytes.
 //
-// This module restores exactly that capability. On a modern core it registers
-// its own boot-keyboard report descriptor (report id 2, byte-for-byte the same
-// descriptor the old core hard-coded) with the PluggableUSB `HID()` singleton
-// and sends raw reports through `HID().SendReport(2, buf, 8)` -- producing
-// identical USB traffic to the legacy call. On an old core it falls back to
-// the original `HID_SendReport` (define USE_LEGACY_HID_API to select it).
+// This module restores that capability on the modern core by registering its
+// own boot-keyboard report descriptor (report id 2) with the PluggableUSB
+// `HID()` singleton and sending raw reports through `HID().SendReport(2, buf,
+// 8)`.
 
 #if !defined(__HOST_KEYBOARD_H_)
 #define __HOST_KEYBOARD_H_
@@ -29,7 +27,7 @@
 #include <Arduino.h>
 
 // Register the keyboard HID interface with the USB stack. Call once from
-// setup(). No-op on the legacy code path.
+// setup().
 void HostKeyboardBegin();
 
 // Send a raw 8-byte boot-keyboard report to the host. This is the positional

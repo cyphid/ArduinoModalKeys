@@ -51,15 +51,10 @@ positional access to the raw bytes this project relies on.
 The raw capability is still reachable, just relocated: the modern core exposes
 a `HID()` singleton with `SendReport(id, data, len)`, but it ships with **no
 report descriptor**. [`host_keyboard.cpp`](modal_keys/host_keyboard.cpp)
-bridges the gap — it registers a boot-keyboard descriptor (report id 2, copied
-byte-for-byte from the one the old core hard-coded) and sends raw reports
-through `HID().SendReport(2, buf, 8)`. Because both the old free function and
-`SendReport()` prepend the report-id byte and then emit the payload verbatim,
-the USB traffic is **identical** to the original.
-
-* **Modern AVR core (default):** nothing to do — builds as-is.
-* **Old AVR core (`<= 1.6.5`):** compile with `-DUSE_LEGACY_HID_API` to restore
-  the original `HID_SendReport` call path.
+bridges the gap — it registers a boot-keyboard descriptor (report id 2) and
+sends raw reports through `HID().SendReport(2, buf, 8)`. Because both the old
+free function and `SendReport()` prepend the report-id byte and then emit the
+payload verbatim, the USB traffic is **identical** to the original.
 
 ### Input side — USB Host Shield 2.0 (reading the attached keyboard)
 
