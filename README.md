@@ -31,3 +31,57 @@ into sets of (Shift, Alt, Ctrl, Gui/Super/Command/Win) modifiers, each of which 
 * Plug your USB keyboard into the USB port on the USB Host Shield
 * Plug the Arduino back into the computer
 * Keystrokes typed into this keyboard should now be sent to your computer through the Arduino Leonardo
+
+## Library Compatibility
+
+This sketch works directly on raw 8-byte HID boot-keyboard reports and needs
+*positional* write access to the wire buffer (modifier byte, reserved byte,
+six key slots). Two libraries it depended on have since reshaped their APIs,
+so the original 2017 code no longer compiles on current versions. The code now
+targets the **current** libraries, with a fallback for old ones.
+
+### Output side — Arduino AVR core (the keyboard the Leonardo presents to the PC)
+
+The sketch used to push reports with the core's `HID_SendReport(2, buf, 8)`
+free function. That function was **removed** from the AVR core in mid-2015
+(core `>= 1.6.6`, the PluggableUSB rework). The modern `Keyboard` library only
+offers `press()` / `release()` / `write()` over its own private buffer — no
+positional access to the raw bytes this project relies on.
+
+The raw capability is still reachable, just relocated: the modern core exposes
+a `HID()` singleton with `SendReport(id, data, len)`, but it ships with **no
+report descriptor**. [`host_keyboard.cpp`](modal_keys/host_keyboard.cpp)
+bridges the gap — it registers a boot-keyboard descriptor (report id 2, copied
+byte-for-byte from the one the old core hard-coded) and sends raw reports
+through `HID().SendReport(2, buf, 8)`. Because both the old free function and
+`SendReport()` prepend the report-id byte and then emit the payload verbatim,
+the USB traffic is **identical** to the original.
+
+* **Modern AVR core (default):** nothing to do — builds as-is.
+* **Old AVR core (`<= 1.6.5`):** compile with `-DUSE_LEGACY_HID_API` to restore
+  the original `HID_SendReport` call path.
+
+### Input side — USB Host Shield 2.0 (reading the attached keyboard)
+
+Two renames in the current [USB Host Shield
+2.0](https://github.com/felis/USB_Host_Shield_2.0) library:
+
+* the `HID` class became `USBHID` (to stop colliding with the core's `HID`
+  object), so `KeyboardReportParser::Parse(...)` now takes a `USBHID *`;
+* `HID_PROTOCOL_KEYBOARD` became `USB_HID_PROTOCOL_KEYBOARD`.
+
+Both are reflected in `modal_keys.ino`.
+
+### Verifying a build
+
+The sketch compiles and links to a flashable Leonardo firmware against the
+latest Arduino AVR core and the latest USB Host Shield 2.0 using only
+`avr-gcc` — no Arduino IDE required:
+
+```
+avr-g++ -mmcu=atmega32u4 -DF_CPU=16000000L -DARDUINO_AVR_LEONARDO \
+        -DUSB_VID=0x2341 -DUSB_PID=0x8036 ... \
+        -I<core>/cores/arduino -I<core>/variants/leonardo \
+        -I<core>/libraries/HID/src -I<USB_Host_Shield_2.0> \
+        -c modal_keys/*.cpp
+```
