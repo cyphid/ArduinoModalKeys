@@ -10,14 +10,11 @@
 //                             USB host via Pico-PIO-USB, device via TinyUSB.
 //   * MODAL_TARGET_LEONARDO -- Arduino Leonardo + USB Host Shield 2.0.
 //                              USB host via the shield, device via PluggableUSB.
-//
-// LEONARDO is kept as a legacy alias for the original manual switch.
 // ===========================================================================
 #if defined(ARDUINO_ARCH_RP2040)
     #define MODAL_TARGET_RP2040
 #else
     #define MODAL_TARGET_LEONARDO
-    #define LEONARDO
 #endif
 
 #include "modal_keys.h"
@@ -317,7 +314,7 @@ void PressKey(RichKey key){
 
 inline void SendKeysToHost (uint8_t buf[8])
 {
-#if defined(MODAL_TARGET_RP2040) || defined(LEONARDO)
+#if defined(MODAL_TARGET_RP2040) || defined(MODAL_TARGET_LEONARDO)
     SendKeyReport(buf);
 #else
     Serial.write(buf, 8);
