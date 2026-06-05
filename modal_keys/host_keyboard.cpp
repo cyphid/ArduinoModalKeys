@@ -1,5 +1,47 @@
 #include "host_keyboard.h"
 
+#if defined(ARDUINO_ARCH_RP2040)
+
+// ===========================================================================
+// Raw USB keyboard output for the Adafruit Feather RP2040 USB Host (TinyUSB).
+// ---------------------------------------------------------------------------
+// The modal-keys engine works on raw 8-byte HID boot-keyboard reports. The
+// Adafruit TinyUSB device stack lets us present a standard keyboard interface
+// and push those raw bytes straight onto the wire. The report descriptor
+// produced by TUD_HID_REPORT_DESC_KEYBOARD() has the boot-keyboard layout
+// (1 modifier byte, 1 reserved byte, six key codes), so our buf[8] maps onto
+// it verbatim, exactly as it did for the Leonardo.
+//
+// Requires the Arduino IDE "USB Stack" to be set to "Adafruit TinyUSB".
+// ===========================================================================
+
+#include "Adafruit_TinyUSB.h"
+
+static uint8_t const _bootKeyboardDescriptor[] = {
+    TUD_HID_REPORT_DESC_KEYBOARD()
+};
+
+// Report-id 0 (no report id in the descriptor), polled like a normal keyboard.
+static Adafruit_USBD_HID usb_hid(_bootKeyboardDescriptor,
+                                 sizeof(_bootKeyboardDescriptor),
+                                 HID_ITF_PROTOCOL_KEYBOARD, 2, false);
+
+void HostKeyboardBegin() {
+    usb_hid.begin();
+}
+
+void SendKeyReport(uint8_t buf[8]) {
+    // The engine calls this from core1 (inside the USB-host report callback);
+    // usb_hid lives on core0. Wait until the device endpoint is ready, then
+    // hand over the raw 8-byte boot report (report id 0).
+    while (!usb_hid.ready()) {
+        yield();
+    }
+    usb_hid.sendReport(0, buf, 8);
+}
+
+#else
+
 // ===========================================================================
 // Raw USB keyboard output for the Arduino AVR core (PluggableUSB).
 // ---------------------------------------------------------------------------
@@ -49,3 +91,5 @@ void HostKeyboardBegin() {
 void SendKeyReport(uint8_t buf[8]) {
     HID().SendReport(2, buf, 8);
 }
+
+#endif

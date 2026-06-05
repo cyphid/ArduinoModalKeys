@@ -1,10 +1,37 @@
-#define LEONARDO
+// ===========================================================================
+// Target selection
+// ---------------------------------------------------------------------------
+// The modal-keys engine (keymap.cpp / helpers.cpp) is board independent: it
+// only manipulates raw 8-byte boot-keyboard buffers. The two pieces that *are*
+// board specific are reading the attached keyboard (USB host) and presenting a
+// keyboard to the PC (USB device). Both supported targets are detected here:
+//
+//   * MODAL_TARGET_RP2040  -- Adafruit Feather RP2040 with USB Type A Host.
+//                             USB host via Pico-PIO-USB, device via TinyUSB.
+//   * MODAL_TARGET_LEONARDO -- Arduino Leonardo + USB Host Shield 2.0.
+//                              USB host via the shield, device via PluggableUSB.
+//
+// LEONARDO is kept as a legacy alias for the original manual switch.
+// ===========================================================================
+#if defined(ARDUINO_ARCH_RP2040)
+    #define MODAL_TARGET_RP2040
+#else
+    #define MODAL_TARGET_LEONARDO
+    #define LEONARDO
+#endif
 
 #include "modal_keys.h"
 #include "keymap.h"
 #include "helpers.h"
 #include "host_keyboard.h"
 
+#if defined(MODAL_TARGET_RP2040)
+// Adafruit Feather RP2040 USB Host: USB host runs on the second core through
+// the Pico-PIO-USB library; the keyboard we present to the PC is TinyUSB
+// (see host_keyboard.cpp). Requires "USB Stack: Adafruit TinyUSB".
+#include "pio_usb.h"
+#include "Adafruit_TinyUSB.h"
+#else
 #include <SoftwareSerial.h>
 #include <USBAPI.h>
 #include <hidboot.h>
@@ -14,6 +41,7 @@
 #include <spi4teensy3.h>
 #include <SPI.h>
 #include <EEPROM.h>
+#endif
 #endif
 
 
@@ -27,19 +55,7 @@ void SendState(uint8_t buf[8]);
 void PrintState(uint8_t inBuf[8], uint8_t outBuf[8], bool outputChanged);
 void PressKey(RichKey key);
 void SendKeysToHost(uint8_t buf[8]);
-
-// *******************************************************************************************
-// Types
-// *******************************************************************************************
-
-class KbdRptParser : public KeyboardReportParser
-{
-protected:
-    // USB Host Shield 2.0 renamed its HID class to USBHID (to stop it
-    // colliding with the Arduino core's HID object). Match the current
-    // KeyboardReportParser::Parse signature so this still overrides it.
-    void Parse(USBHID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf);
-};
+void HandleKeyboardReport(uint8_t buf[8]);
 
 // *******************************************************************************************
 // Variables
@@ -48,28 +64,114 @@ protected:
 bool WriteToLog = true;
 bool SendOutput = true;
 
-USB Usb;
-HIDBoot<USB_HID_PROTOCOL_KEYBOARD> HidKeyboard(&Usb);
-KbdRptParser Prs;
-
 uint8_t InputBuffer[8] = { 0 };
 uint8_t OutputBuffer[8] = { 0 };
 
 // *******************************************************************************************
-// Parse
+// Engine entry point (shared by both targets)
 // *******************************************************************************************
 
-void KbdRptParser::Parse(USBHID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf) {
-    // On error - return
+// Feed one raw 8-byte boot-keyboard report from the attached keyboard into the
+// modal-keys engine. Both the USB Host Shield parser (Leonardo) and the TinyUSB
+// host callback (RP2040) call this with the same buffer layout.
+void HandleKeyboardReport(uint8_t buf[8]) {
+    // On error (phantom / rollover) - return
     if (buf[2] == 1) return;
 
     uint8_t outbuf[8] = { 0 };
     TransformBuffer(buf, outbuf);
 
-    CopyBuf(buf, prevState.bInfo);
     CopyBuf(buf, InputBuffer);
     TransitionToState(outbuf);
 }
+
+// *******************************************************************************************
+// Per-target USB host (reading the attached keyboard)
+// *******************************************************************************************
+
+#if defined(MODAL_TARGET_LEONARDO)
+
+// USB Host Shield 2.0 renamed its HID class to USBHID (to stop it colliding
+// with the Arduino core's HID object). Match the current
+// KeyboardReportParser::Parse signature so this still overrides it.
+class KbdRptParser : public KeyboardReportParser
+{
+protected:
+    void Parse(USBHID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf);
+};
+
+USB Usb;
+HIDBoot<USB_HID_PROTOCOL_KEYBOARD> HidKeyboard(&Usb);
+KbdRptParser Prs;
+
+void KbdRptParser::Parse(USBHID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf) {
+    HandleKeyboardReport(buf);
+}
+
+#elif defined(MODAL_TARGET_RP2040)
+
+// USB host object, served by the Pico-PIO-USB bit-banged port on core1.
+Adafruit_USBH_Host USBHost;
+
+// The Feather RP2040 USB Host board variant defines these; provide the
+// board's documented defaults as a fallback (D+ = GPIO16, D- = GPIO17,
+// 5V enable = GPIO18, active high).
+#ifndef PIN_USB_HOST_DP
+#define PIN_USB_HOST_DP 16
+#endif
+#ifndef PIN_5V_EN
+#define PIN_5V_EN 18
+#endif
+#ifndef PIN_5V_EN_STATE
+#define PIN_5V_EN_STATE 1
+#endif
+
+static void rp2040_configure_pio_usb() {
+    // Power the USB-A port.
+    pinMode(PIN_5V_EN, OUTPUT);
+    digitalWrite(PIN_5V_EN, PIN_5V_EN_STATE);
+
+    pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
+    pio_cfg.pin_dp = PIN_USB_HOST_DP;
+    USBHost.configure_pio_usb(1, &pio_cfg);
+}
+
+// TinyUSB host callbacks. These run on core1; they hand each raw report to the
+// shared engine, which forwards remapped reports to the device side on core0.
+extern "C" {
+
+void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance,
+                      uint8_t const *desc_report, uint16_t desc_len) {
+    (void)desc_report;
+    (void)desc_len;
+    // Only drive boot-style keyboards into the engine.
+    if (tuh_hid_interface_protocol(dev_addr, instance) == HID_ITF_PROTOCOL_KEYBOARD) {
+        if (WriteToLog) Serial.println("Keyboard attached.");
+        tuh_hid_receive_report(dev_addr, instance);
+    }
+}
+
+void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
+    (void)dev_addr;
+    (void)instance;
+    if (WriteToLog) Serial.println("Keyboard detached.");
+}
+
+void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance,
+                                uint8_t const *report, uint16_t len) {
+    // The engine speaks the 8-byte boot-keyboard report exclusively.
+    if (len == 8) {
+        uint8_t buf[8];
+        CopyBuf((uint8_t *)report, buf);
+        HandleKeyboardReport(buf);
+    }
+    // Re-arm: ask for the next report.
+    tuh_hid_receive_report(dev_addr, instance);
+}
+
+} // extern "C"
+
+#endif
 
 // *******************************************************************************************
 // Helper Functions
@@ -141,19 +243,20 @@ String KeyToHexString(uint8_t key) {
 }
 
 String ModifiersToString(uint8_t mods) {
-    MODIFIERKEYS mod;
-    *((uint8_t*)&mod) = mods;
-    String str = "<" +
-    String((mod.bmLeftCtrl   == 1) ? "C" : "-") +
-    String((mod.bmLeftShift  == 1) ? "S" : "-") +
-    String((mod.bmLeftAlt    == 1) ? "A" : "-") +
-    String((mod.bmLeftGUI    == 1) ? "G" : "-") +
-    "." +
-    String((mod.bmRightCtrl   == 1) ? "C" : "-") +
-    String((mod.bmRightShift  == 1) ? "S" : "-") +
-    String((mod.bmRightAlt    == 1) ? "A" : "-") +
-    String((mod.bmRightGUI    == 1) ? "G" : "-") +
-    ">";
+    // The boot-keyboard modifier byte uses the same bit order as the LCtrl..RGui
+    // masks in keys.h, so decode it directly rather than via the USB Host
+    // Shield's MODIFIERKEYS union (which is unavailable on the RP2040 target).
+    String str = "<";
+    str += (mods & LCtrl)  ? "C" : "-";
+    str += (mods & LShift) ? "S" : "-";
+    str += (mods & LAlt)   ? "A" : "-";
+    str += (mods & LGui)   ? "G" : "-";
+    str += ".";
+    str += (mods & RCtrl)  ? "C" : "-";
+    str += (mods & RShift) ? "S" : "-";
+    str += (mods & RAlt)   ? "A" : "-";
+    str += (mods & RGui)   ? "G" : "-";
+    str += ">";
     return str;
 }
 
@@ -214,7 +317,7 @@ void PressKey(RichKey key){
 
 inline void SendKeysToHost (uint8_t buf[8])
 {
-#ifdef LEONARDO
+#if defined(MODAL_TARGET_RP2040) || defined(LEONARDO)
     SendKeyReport(buf);
 #else
     Serial.write(buf, 8);
@@ -224,6 +327,8 @@ inline void SendKeysToHost (uint8_t buf[8])
 // *******************************************************************************************
 // Arduino main functions
 // *******************************************************************************************
+
+#if defined(MODAL_TARGET_LEONARDO)
 
 void setup()
 {
@@ -245,4 +350,39 @@ void loop()
 {
     Usb.Task();
 }
+
+#elif defined(MODAL_TARGET_RP2040)
+
+// On the RP2040 the USB device (the keyboard we present to the PC) is serviced
+// on core0, while the USB host (the attached keyboard) is bit-banged on core1.
+
+void setup()
+{
+    Serial.begin( 115200 );
+
+    InitializeState();
+
+    HostKeyboardBegin();   // bring up the TinyUSB keyboard device
+}
+
+void loop()
+{
+    // The TinyUSB device stack is serviced in the background by the core; the
+    // engine is driven entirely by the host report callbacks on core1.
+}
+
+void setup1()
+{
+    // Pico-PIO-USB requires a 120 MHz or 240 MHz CPU clock; the Feather RP2040
+    // USB Host board package selects a compatible clock by default.
+    rp2040_configure_pio_usb();
+    USBHost.begin(1);
+}
+
+void loop1()
+{
+    USBHost.task();
+}
+
+#endif
 

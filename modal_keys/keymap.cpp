@@ -1078,6 +1078,10 @@ ControlCode ChangeOSMode(OSMode osMode) {
     CurrentModeState = Used;
     CurrentOSMode = osMode;
     EEPROM.put( OSModeSlot, osMode );
+#if defined(ARDUINO_ARCH_RP2040)
+    // Flush the change from the RAM mirror to flash.
+    EEPROM.commit();
+#endif
     Log("new OSMode: " + GetOSModeString(osMode));
     return Stop;
 }
@@ -1211,6 +1215,12 @@ String GetLayoutString(KeyboardLayout layout) {
 // ****************************************************************************
 
 void InitializeState() {
+#if defined(ARDUINO_ARCH_RP2040)
+    // On the RP2040 core, EEPROM is emulated in a flash sector and must be
+    // initialised before use (and committed after writes, see ChangeOSMode).
+    // The AVR core needs neither call.
+    EEPROM.begin(256);
+#endif
     LoadOSMode();
 }
 
