@@ -3,6 +3,7 @@
 #include "modal_keys.h"
 #include "keymap.h"
 #include "helpers.h"
+#include "host_keyboard.h"
 
 #include <SoftwareSerial.h>
 #include <USBAPI.h>
@@ -23,7 +24,10 @@
 class KbdRptParser : public KeyboardReportParser
 {
 protected:
-    virtual void Parse(HID *hid, bool is_rpt_id, uint8_t len, uint8_t buf[8]);
+    // USB Host Shield 2.0 renamed its HID class to USBHID (to stop it
+    // colliding with the Arduino core's HID object). Match the current
+    // KeyboardReportParser::Parse signature so this still overrides it.
+    void Parse(USBHID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf);
 };
 
 // *******************************************************************************************
@@ -34,7 +38,7 @@ bool WriteToLog = true;
 bool SendOutput = true;
 
 USB Usb;
-HIDBoot<HID_PROTOCOL_KEYBOARD> HidKeyboard(&Usb);
+HIDBoot<USB_HID_PROTOCOL_KEYBOARD> HidKeyboard(&Usb);
 KbdRptParser Prs;
 
 uint8_t InputBuffer[8] = { 0 };
@@ -44,7 +48,7 @@ uint8_t OutputBuffer[8] = { 0 };
 // Parse
 // *******************************************************************************************
 
-void KbdRptParser::Parse(HID *hid, bool is_rpt_id, uint8_t len, uint8_t buf[8]) {
+void KbdRptParser::Parse(USBHID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf) {
     // On error - return
     if (buf[2] == 1) return;
 
@@ -200,7 +204,7 @@ void PressKey(RichKey key){
 inline void SendKeysToHost (uint8_t buf[8])
 {
 #ifdef LEONARDO
-    HID_SendReport(2,buf,8);
+    SendKeyReport(buf);
 #else
     Serial.write(buf, 8);
 #endif
@@ -213,6 +217,8 @@ inline void SendKeysToHost (uint8_t buf[8])
 void setup()
 {
     InitializeState();
+
+    HostKeyboardBegin();
 
     Serial.begin( 115200 );
 
