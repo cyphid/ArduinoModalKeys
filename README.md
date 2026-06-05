@@ -157,6 +157,29 @@ On the RP2040 the same engine is wired to a completely different USB stack:
 
 ### Verifying a build
 
+The quickest way to check that **both** targets still build is the bundled
+script, which clones the required libraries from GitHub and compiles each
+target with the cross-compilers (no Arduino IDE required):
+
+```
+sudo apt-get install -y gcc-avr avr-libc gcc-arm-none-eabi
+tools/verify_build.sh
+```
+
+It does two things:
+
+* **Leonardo** — a full compile *and link* against the real Arduino AVR core
+  and USB Host Shield 2.0, producing a flashable `.elf`.
+* **RP2040** — compiles the board-independent engine for Cortex-M0+ and the
+  TinyUSB / Pico-PIO-USB glue against a small conformance shim whose signatures
+  are transcribed from (and re-checked against) the upstream headers, then does
+  a relocatable link and audits that every project symbol resolves and only
+  genuine external library symbols remain undefined. A full on-device RP2040
+  firmware link needs the pico-sdk toolchain — use the `arduino-cli` recipe
+  below for that.
+
+The individual commands the script runs are spelled out next.
+
 The **Leonardo** firmware compiles and links against the latest Arduino AVR core and the latest
 USB Host Shield 2.0 using only `avr-gcc` — no Arduino IDE required:
 
