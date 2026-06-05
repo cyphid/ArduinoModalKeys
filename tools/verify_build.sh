@@ -203,18 +203,32 @@ EOF
 #ifndef PIO_USB_SHIM_H
 #define PIO_USB_SHIM_H
 #include <stdint.h>
-// Pico-PIO-USB/src/pio_usb_configuration.h
-typedef struct {
-  uint8_t pin_dp;                 // :10
-  uint8_t pinout;
-  uint8_t sm_tx, sm_rx, sm_eop;
-  void* pio_tx_num; void* pio_rx_num;
+#include <stddef.h>
+// Field names, order and types are transcribed verbatim from
+// Pico-PIO-USB/src/pio_usb_configuration.h so the shim cannot misrepresent the
+// real struct (e.g. the debug pins are int8_t and default to -1, which would
+// narrow if they were uint8_t).
+typedef enum {                     // :3
+  PIO_USB_PINOUT_DPDM = 0,
+  PIO_USB_PINOUT_DMDP,
+} PIO_USB_PINOUT;
+typedef struct {                   // :8
+  uint8_t pin_dp;                  // :9
+  uint8_t pio_tx_num;
+  uint8_t sm_tx;
   uint8_t tx_ch;
-  uint8_t alarm_pool;
-  uint8_t debug_pin_rx, debug_pin_eop;
-  bool skip_alarm_pool;
-} pio_usb_configuration_t;         // :22
-#define PIO_USB_DEFAULT_CONFIG { 0,0,0,1,2,0,0,0,0,-1,-1,false }  // :38
+  uint8_t pio_rx_num;
+  uint8_t sm_rx;
+  uint8_t sm_eop;
+  void*   alarm_pool;
+  int8_t  debug_pin_rx;
+  int8_t  debug_pin_eop;
+  bool    skip_alarm_pool;
+  PIO_USB_PINOUT pinout;
+} pio_usb_configuration_t;         // :21
+// :37
+#define PIO_USB_DEFAULT_CONFIG \
+  { 0, 0, 0, 0, 0, 1, 2, NULL, -1, -1, false, PIO_USB_PINOUT_DPDM }
 #endif
 EOF
 
@@ -223,6 +237,14 @@ EOF
 #define ADAFRUIT_TINYUSB_SHIM_H
 #include <stdint.h>
 #include <stddef.h>
+// Model the fact that, on the real RP2040, the TinyUSB / Pico-PIO-USB headers
+// (through the arduino-pico core's SPI library) drag the C++ standard library
+// into the sketch translation unit. Several STL headers use short reserved
+// identifiers such as _E and _T as template parameters, which clash with the
+// single-letter key macros in keys.h (_A.._Z) if keys.h is included first.
+// Pulling <map> in here lets the shim reproduce that clash, so the sketch must
+// include this header before its own headers -- exactly as the real build does.
+#include <map>
 // class/hid/hid.h:71
 enum { HID_ITF_PROTOCOL_NONE = 0, HID_ITF_PROTOCOL_KEYBOARD = 1, HID_ITF_PROTOCOL_MOUSE = 2 };
 // class/hid/hid_device.h:177
@@ -275,7 +297,12 @@ verify_rp2040() {
 
     local B="$BUILD/rp2040"
     rm -rf "$B"; mkdir -p "$B"; cd "$B"
-    local FLAGS="-mcpu=cortex-m0plus -mthumb -Os -w -std=gnu++17 \
+    # Match the arduino-pico core's warning profile rather than silencing
+    # everything: -Werror=return-type is what the real RP2040 build enforces (and
+    # what the full build in verify_rp2040_full() relies on), so the fast shim
+    # check must enforce it too. NB: a blanket -w would suppress it, so it is
+    # gone; -Wno-psabi just hushes a noisy ARM ABI note, as upstream does.
+    local FLAGS="-mcpu=cortex-m0plus -mthumb -Os -Werror=return-type -Wno-psabi -std=gnu++17 \
         -fno-exceptions -fno-threadsafe-statics -DARDUINO_ARCH_RP2040 -DARDUINO=10819"
     local INC="-I$SHIM -I$SRC"
 
@@ -348,6 +375,7 @@ cross_check_signatures() {
     check "tuh_hid_report_received_cb" "$TU/src/class/hid/hid_host.h"      "void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t idx, const uint8_t \*report, uint16_t len)"
     check "HID_ITF_PROTOCOL_KEYBOARD"  "$TU/src/class/hid/hid.h"          "HID_ITF_PROTOCOL_KEYBOARD = 1"
     check "pin_dp"                "$PIO/src/pio_usb_configuration.h"        "uint8_t pin_dp"
+    check "debug_pin_rx (int8_t)" "$PIO/src/pio_usb_configuration.h"        "int8_t debug_pin_rx"
     [ "$miss" = 0 ] && green "  shim signatures match upstream headers" \
                     || fail "conformance shim is out of date with upstream"
 }
