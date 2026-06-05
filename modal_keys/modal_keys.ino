@@ -17,18 +17,27 @@
     #define MODAL_TARGET_LEONARDO
 #endif
 
+// Adafruit Feather RP2040 USB Host: USB host runs on the second core through
+// the Pico-PIO-USB library; the keyboard we present to the PC is TinyUSB
+// (see host_keyboard.cpp). Requires "USB Stack: Adafruit TinyUSB".
+//
+// These headers must be pulled in *before* the project headers below: on the
+// RP2040 they drag in the C++ standard library (e.g. <map> via the core's SPI
+// library), and several STL headers use short reserved identifiers such as _E
+// and _T as template parameters. Those collide with the single-letter key
+// macros defined in keys.h (_A.._Z), so the STL has to be parsed before keys.h
+// defines them.
+#if defined(MODAL_TARGET_RP2040)
+#include "pio_usb.h"
+#include "Adafruit_TinyUSB.h"
+#endif
+
 #include "modal_keys.h"
 #include "keymap.h"
 #include "helpers.h"
 #include "host_keyboard.h"
 
-#if defined(MODAL_TARGET_RP2040)
-// Adafruit Feather RP2040 USB Host: USB host runs on the second core through
-// the Pico-PIO-USB library; the keyboard we present to the PC is TinyUSB
-// (see host_keyboard.cpp). Requires "USB Stack: Adafruit TinyUSB".
-#include "pio_usb.h"
-#include "Adafruit_TinyUSB.h"
-#else
+#if defined(MODAL_TARGET_LEONARDO)
 #include <SoftwareSerial.h>
 #include <USBAPI.h>
 #include <hidboot.h>

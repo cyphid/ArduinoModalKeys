@@ -205,6 +205,7 @@ RichKey CapsLockMod() {
         case Windows: return (RichKey){ LCtrl, 0 };
         case OSX: return (RichKey) { LGui, 0 };
     }
+    return (RichKey){ LCtrl, 0 };
 }
 
 RichKey LCtrlMod() {
@@ -212,6 +213,7 @@ RichKey LCtrlMod() {
         case Windows: return (RichKey) { LCtrl, 0 };
         case OSX: return (RichKey) { LCtrl, 0 };
     }
+    return (RichKey){ LCtrl, 0 };
 }
 
 uint8_t AppSwitchModifierKeycode(Side side) {
@@ -227,6 +229,7 @@ uint8_t AppSwitchModifierKeycode(Side side) {
                 case OSX: return RGui;
             }
     }
+    return 0;
 }
 
 uint8_t WindowSnapModifierKeycode() {
@@ -234,6 +237,7 @@ uint8_t WindowSnapModifierKeycode() {
         case Windows: return LCtrl | LGui;
         case OSX: return LCtrl | LGui | LShift;
     }
+    return LCtrl | LGui;
 }
 
 // ****************************************************************************
@@ -354,6 +358,8 @@ ControlCode mapNormalKeyToCurrentLayout(uint8_t inbuf[8], uint8_t i, uint8_t out
 
         return SendKey(inkey, outbuf);
     }
+    // i == 1 (the reserved byte) is never passed in by TransformBuffer.
+    return Continue;
 }
 
 // the keymap that just maps the key to the current keyboard layout
@@ -812,6 +818,8 @@ ControlCode GamingCtrl_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
         uint8_t key = inbuf[i];
         return SendKeyCombo(mods, key, outbuf);
     }
+    // i == 1 (the reserved byte) is never passed in by TransformBuffer.
+    return Continue;
 }
 
 ControlCode GamingAlt_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
@@ -1165,6 +1173,7 @@ String GetOSModeString(OSMode osMode) {
         case Windows:    return "Win";
         case OSX:        return "OSX";
     }
+    return "Win";
 }
 
 String GetModeString(Mode mode) {
@@ -1208,6 +1217,7 @@ String GetLayoutString(KeyboardLayout layout) {
         case dvorak:    return "DV";
         // case dvorakProgrammer:   return "DVP";
     }
+    return "QY";
 }
 
 // ****************************************************************************

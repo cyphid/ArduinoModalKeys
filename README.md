@@ -166,17 +166,24 @@ sudo apt-get install -y gcc-avr avr-libc gcc-arm-none-eabi
 tools/verify_build.sh
 ```
 
-It does two things:
+It does three things:
 
 * **Leonardo** — a full compile *and link* against the real Arduino AVR core
   and USB Host Shield 2.0, producing a flashable `.elf`.
-* **RP2040** — compiles the board-independent engine for Cortex-M0+ and the
-  TinyUSB / Pico-PIO-USB glue against a small conformance shim whose signatures
-  are transcribed from (and re-checked against) the upstream headers, then does
-  a relocatable link and audits that every project symbol resolves and only
-  genuine external library symbols remain undefined. A full on-device RP2040
-  firmware link needs the pico-sdk toolchain — use the `arduino-cli` recipe
-  below for that.
+* **RP2040 (shim)** — compiles the board-independent engine for Cortex-M0+ and
+  the TinyUSB / Pico-PIO-USB glue against a small conformance shim whose
+  signatures are transcribed from (and re-checked against) the upstream headers,
+  then does a relocatable link and audits that every project symbol resolves and
+  only genuine external library symbols remain undefined. Fast and needs no
+  board package, but by design it cannot see the real C++ standard library, so
+  it is a structural check only.
+* **RP2040 (full)** — a *real* full firmware build with `arduino-cli` against the
+  actual arduino-pico board package, Adafruit TinyUSB and Pico-PIO-USB libraries,
+  producing a flashable `.uf2` — exactly what the Arduino IDE does. This catches
+  what the shim cannot: clashes with the real STL those libraries pull in, and
+  `-Werror=return-type` (which the arduino-pico core enables). It soft-skips if
+  `arduino-cli` is not installed; install it from
+  <https://arduino.github.io/arduino-cli/>.
 
 The individual commands the script runs are spelled out next.
 

@@ -3,26 +3,32 @@
 # verify_build.sh -- compile-verify both hardware targets of ArduinoModalKeys
 # without the Arduino IDE.
 #
-# It checks two things:
+# It checks three things:
 #
 #   1. LEONARDO  -- a full compile *and link* of a flashable Leonardo firmware
 #                   against the real Arduino AVR core and the real USB Host
 #                   Shield 2.0 library, using avr-gcc.
 #
-#   2. RP2040    -- (Adafruit Feather RP2040 USB Host) the board-independent
+#   2. RP2040 (shim) -- (Adafruit Feather RP2040 USB Host) the board-independent
 #                   engine is compiled for Cortex-M0+, and the TinyUSB /
 #                   Pico-PIO-USB glue is compiled against a small "conformance
 #                   shim" whose declarations are transcribed verbatim from the
 #                   upstream library headers. A relocatable link then proves
 #                   that every project symbol resolves and only genuine
-#                   external library symbols remain undefined.
+#                   external library symbols remain undefined. This is fast and
+#                   needs no board package -- but, by design, it cannot see the
+#                   real C++ standard library, so it is a structural check only.
 #
-#                   A full RP2040 firmware link is intentionally *not* done:
-#                   that needs the pico-sdk + arduino-pico toolchain, which the
-#                   Arduino IDE / arduino-cli provides. Use the arduino-cli
-#                   recipe in README.md for an on-device build.
+#   3. RP2040 (full) -- a *real* full firmware build with arduino-cli against
+#                   the actual arduino-pico board package + Adafruit TinyUSB +
+#                   Pico-PIO-USB, producing a flashable .uf2 (exactly what the
+#                   Arduino IDE does). This is what catches issues the shim
+#                   cannot, e.g. clashes with the STL those libraries pull in,
+#                   and -Werror=return-type (enabled by the arduino-pico core).
+#                   Soft-skips if arduino-cli is not installed.
 #
 # Toolchains (Debian/Ubuntu):  apt-get install gcc-avr avr-libc gcc-arm-none-eabi
+# Plus arduino-cli for check 3:  https://arduino.github.io/arduino-cli/
 # Libraries are cloned from GitHub into $WORK/libs on first run and reused.
 #
 # Usage:   tools/verify_build.sh            # run both checks
@@ -347,6 +353,84 @@ cross_check_signatures() {
 }
 
 # --------------------------------------------------------------------------
+# Target 3: RP2040 (Cortex-M0+) -- REAL full firmware build via arduino-cli.
+# --------------------------------------------------------------------------
+# Unlike verify_rp2040() above (which links the engine against a hand-written
+# conformance shim), this compiles the sketch against the *actual* arduino-pico
+# board package, Adafruit TinyUSB and Pico-PIO-USB libraries and produces a
+# flashable .uf2 -- exactly what the Arduino IDE does. This is what catches
+# problems the shim cannot see: clashes with the real C++ standard library that
+# those libraries drag in, and -Werror=return-type (which the arduino-pico core
+# enables and the AVR/-w build does not).
+#
+# It needs arduino-cli and network access. If arduino-cli is missing it is a
+# soft SKIP (the shim build above still ran); a genuine *compile* failure is
+# always fatal.
+#
+# Env overrides (mainly for sandboxed/CI networks):
+#   ARDUINO_CLI       path to the arduino-cli binary (default: arduino-cli)
+#   MODAL_CTAGS_PATH  dir containing a `ctags` binary, passed through as
+#                     runtime.tools.ctags.path (only needed where arduino-cli
+#                     cannot fetch its bundled ctags, e.g. downloads.arduino.cc
+#                     is blocked).
+verify_rp2040_full() {
+    bold "== Target 3: Adafruit Feather RP2040 USB Host -- full firmware (arduino-cli) =="
+    local ACLI="${ARDUINO_CLI:-arduino-cli}"
+    if ! command -v "$ACLI" >/dev/null 2>&1; then
+        red "  SKIP: arduino-cli not found -- install it to run the full firmware build."
+        red "        https://arduino.github.io/arduino-cli/latest/installation/"
+        return 0
+    fi
+
+    # Keep all arduino-cli state inside $WORK so the script is self-contained and
+    # does not touch the user's ~/.arduino15.
+    export ARDUINO_DIRECTORIES_DATA="$WORK/arduino15"
+    export ARDUINO_DIRECTORIES_USER="$WORK/Arduino"
+    export ARDUINO_DIRECTORIES_DOWNLOADS="$WORK/arduino15/staging"
+    export ARDUINO_BOARD_MANAGER_ADDITIONAL_URLS="https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json"
+    export ARDUINO_LIBRARY_ENABLE_UNSAFE_INSTALL=true
+    mkdir -p "$ARDUINO_DIRECTORIES_DATA" "$ARDUINO_DIRECTORIES_USER"
+
+    local FQBN="rp2040:rp2040:adafruit_feather_usb_host:usbstack=tinyusb"
+
+    # The earlephilhower index + core + tools are all served from GitHub; the
+    # main Arduino index (downloads.arduino.cc) is only needed for builtin tools
+    # like ctags, so tolerate its failure when MODAL_CTAGS_PATH provides one.
+    echo "  updating board index ..."
+    "$ACLI" core update-index >/dev/null 2>&1 || true
+
+    if ! "$ACLI" core list 2>/dev/null | grep -q '^rp2040:rp2040'; then
+        echo "  installing rp2040:rp2040 core (~100 MB, first run only) ..."
+        "$ACLI" core install rp2040:rp2040 >/dev/null 2>&1 \
+            || fail "RP2040 full: could not install rp2040:rp2040 core"
+    fi
+
+    if [ ! -d "$ARDUINO_DIRECTORIES_USER/libraries/Pico_PIO_USB" ]; then
+        echo "  installing Pico-PIO-USB library ..."
+        "$ACLI" lib install --git-url https://github.com/sekigon-gonnoc/Pico-PIO-USB.git \
+            >/dev/null 2>&1 || fail "RP2040 full: could not install Pico-PIO-USB"
+    fi
+
+    local B="$BUILD/rp2040_full"
+    rm -rf "$B"; mkdir -p "$B"
+
+    local ctags_prop=()
+    [ -n "${MODAL_CTAGS_PATH:-}" ] && ctags_prop=(--build-property "runtime.tools.ctags.path=$MODAL_CTAGS_PATH")
+
+    echo "  compiling real firmware (FQBN: $FQBN) ..."
+    "$ACLI" compile --fqbn "$FQBN" "${ctags_prop[@]}" \
+        --output-dir "$B" "$SRC" 2>&1 \
+        | grep -vE 'Downloading index|Error initializing instance|Multiple libraries|Not used:|^  Used:' \
+        || fail "RP2040 full: arduino-cli compile failed"
+
+    local uf2
+    uf2="$(ls "$B"/*.uf2 2>/dev/null | head -1)"
+    [ -n "$uf2" ] || fail "RP2040 full: no .uf2 firmware produced"
+    echo "  produced: $(basename "$uf2") ($(wc -c < "$uf2") bytes)"
+    green "  RP2040: real firmware compiled and a flashable .uf2 was produced OK"
+}
+
+# --------------------------------------------------------------------------
 main() {
     need git git
     bold "ArduinoModalKeys build verification"
@@ -356,6 +440,8 @@ main() {
     verify_leonardo
     echo
     verify_rp2040
+    echo
+    verify_rp2040_full
     echo
     green "ALL TARGETS VERIFIED"
 }
