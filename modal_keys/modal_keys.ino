@@ -18,6 +18,17 @@
 
 
 // *******************************************************************************************
+// Forward declarations
+// (The IDE's automatic prototype generation misses these, so declare them explicitly.)
+// *******************************************************************************************
+
+bool TransitionToState(uint8_t newbuf[8]);
+void SendState(uint8_t buf[8]);
+void PrintState(uint8_t inBuf[8], uint8_t outBuf[8], bool outputChanged);
+void PressKey(RichKey key);
+void SendKeysToHost(uint8_t buf[8]);
+
+// *******************************************************************************************
 // Types
 // *******************************************************************************************
 
@@ -58,7 +69,7 @@ void KbdRptParser::Parse(USBHID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf)
     CopyBuf(buf, prevState.bInfo);
     CopyBuf(buf, InputBuffer);
     TransitionToState(outbuf);
-};
+}
 
 // *******************************************************************************************
 // Helper Functions
@@ -234,3 +245,4 @@ void loop()
 {
     Usb.Task();
 }
+
