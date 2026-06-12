@@ -8,9 +8,12 @@
 
 #include <EEPROM.h>
 
-// Map of where in EEPROM storage to store each config variable
+// Map of where in EEPROM storage to store each config variable.
+// Slots are spaced 4 bytes apart: EEPROM.put/get serialize the full enum,
+// which is 4 bytes on ARM (RP2040), so adjacent addresses would overlap.
 #define OSModeSlot 0
-#define KeyboardLayoutSlot 1
+#define KeyboardLayoutSlot 4
+#define EntryPointModeSlot 8
 
 // ****************************************************************************
 // Type Declarations
@@ -86,6 +89,7 @@ typedef ControlCode(*KeyMapFunc)(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8])
 
 // helpers
 void LoadOSMode();
+void LoadConfiguration();
 ControlCode ChangeOSMode(OSMode osMode);
 void SetMode(Mode mode, ModeState modeState);
 ControlCode EnterMode(Mode mode, ModeState modeState);
@@ -1077,7 +1081,33 @@ void HandleLastKeyReleased() {
 void LoadOSMode() {
     OSMode osMode = Windows;
     EEPROM.get( OSModeSlot, osMode );
+    // A freshly flashed/erased EEPROM (or flash-emulated EEPROM on the RP2040)
+    // reads back as 0xFF bytes, which is not a valid OSMode. Fall back to the
+    // Windows default rather than running with an unknown OS mode.
+    if (osMode != Windows && osMode != OSX) {
+        osMode = Windows;
+    }
     CurrentOSMode = osMode;
+}
+
+void LoadConfiguration() {
+    KeyboardLayout layout = CurrentLayout;
+    Mode entryPointMode = EntryPointMode;
+    EEPROM.get( KeyboardLayoutSlot, layout );
+    EEPROM.get( EntryPointModeSlot, entryPointMode );
+    // Validate both values: freshly flashed/erased EEPROM reads as 0xFF bytes,
+    // and only the entry-point modes selectable via ChangeConfiguration are
+    // legal here. If either value is invalid, keep the compiled-in defaults.
+    bool layoutValid = (layout == qwerty || layout == dvorak);
+    bool modeValid = (entryPointMode == NormalNoKeysMode ||
+                      entryPointMode == ModalNoKeysMode ||
+                      entryPointMode == GamingNoKeysMode ||
+                      entryPointMode == BlackDesertNoKeysMode);
+    if (layoutValid && modeValid) {
+        CurrentLayout = layout;
+        EntryPointMode = entryPointMode;
+        CurrentMode = entryPointMode;
+    }
 }
 
 ControlCode ChangeOSMode(OSMode osMode) {
@@ -1107,6 +1137,12 @@ ControlCode ChangeConfiguration(KeyboardLayout layout, Mode entryPointMode) {
     CurrentModeState = Used;
     CurrentLayout = layout;
     EntryPointMode = entryPointMode;
+    EEPROM.put( KeyboardLayoutSlot, layout );
+    EEPROM.put( EntryPointModeSlot, entryPointMode );
+#if defined(ARDUINO_ARCH_RP2040)
+    // Flush the change from the RAM mirror to flash.
+    EEPROM.commit();
+#endif
     Log("new entry point Mode: " + GetModeString(entryPointMode));
     return Stop;
 }
@@ -1230,6 +1266,7 @@ void InitializeState() {
     EEPROM.begin(256);
 #endif
     LoadOSMode();
+    LoadConfiguration();
 }
 
 void TransformBuffer(uint8_t inbuf[8], uint8_t outbuf[8]) {
