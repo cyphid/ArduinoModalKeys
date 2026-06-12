@@ -205,6 +205,7 @@ RichKey CapsLockMod() {
         case Windows: return (RichKey){ LCtrl, 0 };
         case OSX: return (RichKey) { LGui, 0 };
     }
+    return (RichKey){ LCtrl, 0 }; // unreachable; satisfies -Werror=return-type
 }
 
 RichKey LCtrlMod() {
@@ -212,6 +213,7 @@ RichKey LCtrlMod() {
         case Windows: return (RichKey) { LCtrl, 0 };
         case OSX: return (RichKey) { LCtrl, 0 };
     }
+    return (RichKey){ LCtrl, 0 }; // unreachable; satisfies -Werror=return-type
 }
 
 uint8_t AppSwitchModifierKeycode(Side side) {
@@ -227,6 +229,7 @@ uint8_t AppSwitchModifierKeycode(Side side) {
                 case OSX: return RGui;
             }
     }
+    return 0; // unreachable; satisfies -Werror=return-type
 }
 
 uint8_t WindowSnapModifierKeycode() {
@@ -234,6 +237,7 @@ uint8_t WindowSnapModifierKeycode() {
         case Windows: return LCtrl | LGui;
         case OSX: return LCtrl | LGui | LShift;
     }
+    return LCtrl | LGui; // unreachable; satisfies -Werror=return-type
 }
 
 // ****************************************************************************
@@ -253,11 +257,11 @@ ControlCode Escape_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
 
      // map subsequent keys
     if (i >= 2) switch (inbuf[i]) {
-        case _Escape:    return Continue;
-        case _F1:        return ChangeConfiguration(qwerty, NormalNoKeysMode);
-        case _F2:        return ChangeConfiguration(dvorak, ModalNoKeysMode);
-        case _F3:        return ChangeConfiguration(qwerty, GamingNoKeysMode);
-        case _F4:        return ChangeConfiguration(qwerty, BlackDesertNoKeysMode);
+        case KC_Escape:    return Continue;
+        case KC_F1:        return ChangeConfiguration(qwerty, NormalNoKeysMode);
+        case KC_F2:        return ChangeConfiguration(dvorak, ModalNoKeysMode);
+        case KC_F3:        return ChangeConfiguration(qwerty, GamingNoKeysMode);
+        case KC_F4:        return ChangeConfiguration(qwerty, BlackDesertNoKeysMode);
     }
     // all other keys
     return InvalidKey();
@@ -271,7 +275,7 @@ ControlCode CapsLock_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
 
      // map first key
     if (i == 2) switch (inbuf[i]) {
-        case _CapsLock:         return Continue;
+        case KC_CapsLock:         return Continue;
     }
 
     // all other keys
@@ -288,10 +292,10 @@ ControlCode RightCtrl_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
 
      // map first key
     if (i == 2) switch (inbuf[i]) {
-        case _1:        return ChangeConfiguration(qwerty, NormalNoKeysMode);
-        case _2:        return ChangeConfiguration(dvorak, ModalNoKeysMode);
-        case _3:        return ChangeConfiguration(qwerty, GamingNoKeysMode);
-        case _4:        return ChangeConfiguration(qwerty, BlackDesertNoKeysMode);
+        case KC_1:        return ChangeConfiguration(qwerty, NormalNoKeysMode);
+        case KC_2:        return ChangeConfiguration(dvorak, ModalNoKeysMode);
+        case KC_3:        return ChangeConfiguration(qwerty, GamingNoKeysMode);
+        case KC_4:        return ChangeConfiguration(qwerty, BlackDesertNoKeysMode);
     }
     // all other keys
     return EnterMode(NormalTypingMode, Used);
@@ -305,7 +309,7 @@ ControlCode NormalEntryPoint_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[
 
     // key entry points
     if (i == 2) switch (inbuf[i]) {
-        case _Escape:  return EnterMode(EscapeMode, Clean);
+        case KC_Escape:  return EnterMode(EscapeMode, Clean);
     }
 
     // No special behavior activated. Apply normalTypingMode keyboard behavior.
@@ -322,8 +326,8 @@ ControlCode ModalEntryPoint_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8
 
     // key entry points
     if (i == 2) switch (inbuf[i]) {
-        case _Escape:   return EnterMode(EscapeMode, Clean);
-        case _CapsLock: return EnterMode(CapsLockMode, Clean);
+        case KC_Escape:   return EnterMode(EscapeMode, Clean);
+        case KC_CapsLock: return EnterMode(CapsLockMode, Clean);
     }
 
     // No special behavior activated. Apply normalTypingMode keyboard behavior.
@@ -340,13 +344,13 @@ ControlCode mapNormalKeyToCurrentLayout(uint8_t inbuf[8], uint8_t i, uint8_t out
     if (i >= 2) {
         uint8_t inkey = inbuf[i];
         switch (inkey){
-            case _CapsLock:         return SendRichKey(CapsLockMod(), outbuf);
+            case KC_CapsLock:         return SendRichKey(CapsLockMod(), outbuf);
         }
         // lookup key for current keyboard layout
-        if (inkey >= _A && inkey <= _CapsLock){
+        if (inkey >= KC_A && inkey <= KC_CapsLock){
             uint8_t shiftOn = outbuf[1] & (LShift | RShift);
             UnsetModifiers(LShift | RShift, outbuf);
-            KeySpec keySpec = Keymap[CurrentLayout][inkey - _A];
+            KeySpec keySpec = Keymap[CurrentLayout][inkey - KC_A];
             uint8_t mappedShift = shiftOn ? keySpec.shift2 : keySpec.shift1;
             uint8_t mappedKey = shiftOn ? keySpec.key2 : keySpec.key1;
             return SendKeyCombo(mappedShift, mappedKey, outbuf);
@@ -354,6 +358,7 @@ ControlCode mapNormalKeyToCurrentLayout(uint8_t inbuf[8], uint8_t i, uint8_t out
 
         return SendKey(inkey, outbuf);
     }
+    return Continue; // i == 1 (reserved byte): nothing to map
 }
 
 // the keymap that just maps the key to the current keyboard layout
@@ -379,54 +384,54 @@ ControlCode LeftAltMode_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
     // map 1st key
     if (i == 2) switch (inbuf[i]) {
         // map secondary modifier
-        case _X:             return EnterMode(NumPadMode, Used);
-        case _C:             return EnterMode(WindowSnapMode, Used);
+        case KC_X:             return EnterMode(NumPadMode, Used);
+        case KC_C:             return EnterMode(WindowSnapMode, Used);
     }
     // map any key
     if (i >= 2) switch (inbuf[i]) {
         // alt mode modifiers
-        case _Q:             return SendModifiers(LShift, outbuf);
-        case _W:             return SendModifiers(LAlt, outbuf);
-        case _E:             return SendModifiers(LCtrl, outbuf);
-        case _R:             return SendModifiers(LGui, outbuf);
+        case KC_Q:             return SendModifiers(LShift, outbuf);
+        case KC_W:             return SendModifiers(LAlt, outbuf);
+        case KC_E:             return SendModifiers(LCtrl, outbuf);
+        case KC_R:             return SendModifiers(LGui, outbuf);
         // normalTypingMode mode modifiers
-        case _A:             return EnterMode(LeftModMode, Used);
-        case _S:             return EnterMode(LeftModMode, Used);
-        case _D:             return EnterMode(LeftModMode, Used);
-        case _F:             return EnterMode(LeftModMode, Used);
+        case KC_A:             return EnterMode(LeftModMode, Used);
+        case KC_S:             return EnterMode(LeftModMode, Used);
+        case KC_D:             return EnterMode(LeftModMode, Used);
+        case KC_F:             return EnterMode(LeftModMode, Used);
 
         // Left Hand keys
-        case _Backtick:      return EnterMode(AltTabMode, Used);
-        case _Tab:           return EnterMode(AltTabMode, Used);
-        case _1:             return SendKey(_F1, outbuf);
-        case _2:             return SendKey(_F2, outbuf);
-        case _3:             return SendKey(_F3, outbuf);
-        case _4:             return SendKey(_F4, outbuf);
-        case _5:             return SendKey(_F5, outbuf);
-        case _6:             return SendKey(_F6, outbuf);
+        case KC_Backtick:      return EnterMode(AltTabMode, Used);
+        case KC_Tab:           return EnterMode(AltTabMode, Used);
+        case KC_1:             return SendKey(KC_F1, outbuf);
+        case KC_2:             return SendKey(KC_F2, outbuf);
+        case KC_3:             return SendKey(KC_F3, outbuf);
+        case KC_4:             return SendKey(KC_F4, outbuf);
+        case KC_5:             return SendKey(KC_F5, outbuf);
+        case KC_6:             return SendKey(KC_F6, outbuf);
 
         // Right Hand keys
-        case _Y:             return SendKey(_Escape, outbuf);
-        case _U:             return SendKey(_Home, outbuf);
-        case _I:             return SendKey(_PgUp, outbuf);
-        case _O:             return SendKey(_PgDn, outbuf);
-        case _P:             return SendKey(_End, outbuf);
-        case _LeftBracket:   return SendKey(_Enter, outbuf);
-        case _RightBracket:  return SendKey(_Menu, outbuf);
-        case _Backslash:     return EnterMode(AltTabMode, Used);
-        case _Backspace:     return SendKey(_CapsLock, outbuf);
-        case _H:             return SendKey(_Backspace, outbuf);
-        case _J:             return SendKey(_Left, outbuf);
-        case _K:             return SendKey(_Up, outbuf);
-        case _L:             return SendKey(_Down, outbuf);
-        case _Semicolon:     return SendKey(_Right, outbuf);
-        case _Apostrophe:    return SendKey(_Delete, outbuf);
-        case _7:             return SendKey(_F7, outbuf);
-        case _8:             return SendKey(_F8, outbuf);
-        case _9:             return SendKey(_F9, outbuf);
-        case _0:             return SendKey(_F10, outbuf);
-        case _Dash:          return SendKey(_F11, outbuf);
-        case _Equals:        return SendKey(_F12, outbuf);
+        case KC_Y:             return SendKey(KC_Escape, outbuf);
+        case KC_U:             return SendKey(KC_Home, outbuf);
+        case KC_I:             return SendKey(KC_PgUp, outbuf);
+        case KC_O:             return SendKey(KC_PgDn, outbuf);
+        case KC_P:             return SendKey(KC_End, outbuf);
+        case KC_LeftBracket:   return SendKey(KC_Enter, outbuf);
+        case KC_RightBracket:  return SendKey(KC_Menu, outbuf);
+        case KC_Backslash:     return EnterMode(AltTabMode, Used);
+        case KC_Backspace:     return SendKey(KC_CapsLock, outbuf);
+        case KC_H:             return SendKey(KC_Backspace, outbuf);
+        case KC_J:             return SendKey(KC_Left, outbuf);
+        case KC_K:             return SendKey(KC_Up, outbuf);
+        case KC_L:             return SendKey(KC_Down, outbuf);
+        case KC_Semicolon:     return SendKey(KC_Right, outbuf);
+        case KC_Apostrophe:    return SendKey(KC_Delete, outbuf);
+        case KC_7:             return SendKey(KC_F7, outbuf);
+        case KC_8:             return SendKey(KC_F8, outbuf);
+        case KC_9:             return SendKey(KC_F9, outbuf);
+        case KC_0:             return SendKey(KC_F10, outbuf);
+        case KC_Dash:          return SendKey(KC_F11, outbuf);
+        case KC_Equals:        return SendKey(KC_F12, outbuf);
     }
     // all other keys
     return EnterMode(NormalTypingMode, Used);
@@ -444,19 +449,19 @@ ControlCode LeftModMode_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
     // map any key
     if (i >= 2) switch (inbuf[i]) {
         // normalTypingMode mode modifiers
-        case _A:             return SendModifiers(LShift, outbuf);
-        case _S:             return SendModifiers(LAlt, outbuf);
-        case _D:             return SendModifiers(LCtrl, outbuf);
-        case _F:             return SendModifiers(LGui, outbuf);
+        case KC_A:             return SendModifiers(LShift, outbuf);
+        case KC_S:             return SendModifiers(LAlt, outbuf);
+        case KC_D:             return SendModifiers(LCtrl, outbuf);
+        case KC_F:             return SendModifiers(LGui, outbuf);
         // Right hand keys
-        case _7:             return SendKey(_7, outbuf);
-        case _8:             return SendKey(_8, outbuf);
-        case _9:             return SendKey(_9, outbuf);
-        case _0:             return SendKey(_0, outbuf);
-        case _Dash:          return SendKey(_LeftBracket, outbuf);
-        case _Equals:        return SendKey(_RightBracket, outbuf);
-        case _LeftBracket:   return SendKey(_ForwardSlash, outbuf);
-        case _RightBracket:  return SendKey(_Equals, outbuf);
+        case KC_7:             return SendKey(KC_7, outbuf);
+        case KC_8:             return SendKey(KC_8, outbuf);
+        case KC_9:             return SendKey(KC_9, outbuf);
+        case KC_0:             return SendKey(KC_0, outbuf);
+        case KC_Dash:          return SendKey(KC_LeftBracket, outbuf);
+        case KC_Equals:        return SendKey(KC_RightBracket, outbuf);
+        case KC_LeftBracket:   return SendKey(KC_ForwardSlash, outbuf);
+        case KC_RightBracket:  return SendKey(KC_Equals, outbuf);
     }
     // all other keys
     return mapNormalKeyToCurrentLayout(inbuf, i, outbuf);
@@ -470,49 +475,49 @@ ControlCode RightAltMode_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) 
     // map key
     if (i >= 2) switch (inbuf[i]) {
          // alt mode modifiers
-        case _U:             return SendModifiers(RGui, outbuf);
-        case _I:             return SendModifiers(RCtrl, outbuf);
-        case _O:             return SendModifiers(LAlt, outbuf); // RAlt is treated as Alt Grave and doesn't work as Meta key sometimes on Linux
-        case _P:             return SendModifiers(RShift, outbuf);
+        case KC_U:             return SendModifiers(RGui, outbuf);
+        case KC_I:             return SendModifiers(RCtrl, outbuf);
+        case KC_O:             return SendModifiers(LAlt, outbuf); // RAlt is treated as Alt Grave and doesn't work as Meta key sometimes on Linux
+        case KC_P:             return SendModifiers(RShift, outbuf);
         // normalTypingMode mode modifiers
-        case _J:             return EnterMode(RightModMode, Used);
-        case _K:             return EnterMode(RightModMode, Used);
-        case _L:             return EnterMode(RightModMode, Used);
-        case _Semicolon:     return EnterMode(RightModMode, Used);
+        case KC_J:             return EnterMode(RightModMode, Used);
+        case KC_K:             return EnterMode(RightModMode, Used);
+        case KC_L:             return EnterMode(RightModMode, Used);
+        case KC_Semicolon:     return EnterMode(RightModMode, Used);
         // Left Hand keys
-        case _Tab:           return EnterMode(AltTabMode, Used);
-        case _1:             return SendKey(_F1, outbuf);
-        case _2:             return SendKey(_F2, outbuf);
-        case _3:             return SendKey(_F3, outbuf);
-        case _4:             return SendKey(_F4, outbuf);
-        case _5:             return SendKey(_F5, outbuf);
-        case _6:             return SendKey(_F6, outbuf);
+        case KC_Tab:           return EnterMode(AltTabMode, Used);
+        case KC_1:             return SendKey(KC_F1, outbuf);
+        case KC_2:             return SendKey(KC_F2, outbuf);
+        case KC_3:             return SendKey(KC_F3, outbuf);
+        case KC_4:             return SendKey(KC_F4, outbuf);
+        case KC_5:             return SendKey(KC_F5, outbuf);
+        case KC_6:             return SendKey(KC_F6, outbuf);
         // left numpad
-        case _Q:             return SendKeyCombo(RShift, _Semicolon, outbuf);
-        case _W:             return SendKey(_1, outbuf);
-        case _E:             return SendKey(_2, outbuf);
-        case _R:             return SendKey(_3, outbuf);
-        case _T:             return SendKey(_NumpadTimes, outbuf);
+        case KC_Q:             return SendKeyCombo(RShift, KC_Semicolon, outbuf);
+        case KC_W:             return SendKey(KC_1, outbuf);
+        case KC_E:             return SendKey(KC_2, outbuf);
+        case KC_R:             return SendKey(KC_3, outbuf);
+        case KC_T:             return SendKey(KC_NumpadTimes, outbuf);
 
-        case _A:             return SendKey(_Backspace, outbuf);
-        case _S:             return SendKey(_4, outbuf);
-        case _D:             return SendKey(_5, outbuf);
-        case _F:             return SendKey(_6, outbuf);
-        case _G:             return SendKey(_NumpadMinus, outbuf);
+        case KC_A:             return SendKey(KC_Backspace, outbuf);
+        case KC_S:             return SendKey(KC_4, outbuf);
+        case KC_D:             return SendKey(KC_5, outbuf);
+        case KC_F:             return SendKey(KC_6, outbuf);
+        case KC_G:             return SendKey(KC_NumpadMinus, outbuf);
 
-        case _Z:             return SendKey(_7, outbuf);
-        case _X:             return SendKey(_8, outbuf);
-        case _C:             return SendKey(_9, outbuf);
-        case _V:             return SendKey(_NumpadDivide, outbuf);
-        case _B:             return SendKey(_NumpadPlus, outbuf);
-        case _Space:         return SendKey(_0, outbuf);
+        case KC_Z:             return SendKey(KC_7, outbuf);
+        case KC_X:             return SendKey(KC_8, outbuf);
+        case KC_C:             return SendKey(KC_9, outbuf);
+        case KC_V:             return SendKey(KC_NumpadDivide, outbuf);
+        case KC_B:             return SendKey(KC_NumpadPlus, outbuf);
+        case KC_Space:         return SendKey(KC_0, outbuf);
         // right hand numpad helpers
-        case _Enter:         return SendKey(_Enter, outbuf);
-        case _Fullstop:      return SendKey(_Fullstop, outbuf);
-        case _Comma:         return SendKey(_Comma, outbuf);
+        case KC_Enter:         return SendKey(KC_Enter, outbuf);
+        case KC_Fullstop:      return SendKey(KC_Fullstop, outbuf);
+        case KC_Comma:         return SendKey(KC_Comma, outbuf);
 
         // Right Hand keys
-        case _Backslash:     return EnterMode(AltTabMode, Used);
+        case KC_Backslash:     return EnterMode(AltTabMode, Used);
     }
     // all other keys
     return EnterMode(NormalTypingMode, Used);
@@ -530,18 +535,18 @@ ControlCode RightModMode_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) 
     // map any key
     if (i >= 2) switch (inbuf[i]) {
         // normalTypingMode mode modifiers
-        case _J:             return SendModifiers(RGui, outbuf);
-        case _K:             return SendModifiers(RCtrl, outbuf);
-        case _L:             return SendModifiers(LAlt, outbuf); // RAlt is treated as Alt Grave and doesn't work as Meta key sometimes on Linux
-        case _Semicolon:     return SendModifiers(RShift, outbuf);
+        case KC_J:             return SendModifiers(RGui, outbuf);
+        case KC_K:             return SendModifiers(RCtrl, outbuf);
+        case KC_L:             return SendModifiers(LAlt, outbuf); // RAlt is treated as Alt Grave and doesn't work as Meta key sometimes on Linux
+        case KC_Semicolon:     return SendModifiers(RShift, outbuf);
         // Left Hand keys
-        case _Backtick:      return SendKey(_Backtick, outbuf);
-        case _1:             return SendKey(_1, outbuf);
-        case _2:             return SendKey(_2, outbuf);
-        case _3:             return SendKey(_3, outbuf);
-        case _4:             return SendKey(_4, outbuf);
-        case _5:             return SendKey(_5, outbuf);
-        case _6:             return SendKey(_6, outbuf);
+        case KC_Backtick:      return SendKey(KC_Backtick, outbuf);
+        case KC_1:             return SendKey(KC_1, outbuf);
+        case KC_2:             return SendKey(KC_2, outbuf);
+        case KC_3:             return SendKey(KC_3, outbuf);
+        case KC_4:             return SendKey(KC_4, outbuf);
+        case KC_5:             return SendKey(KC_5, outbuf);
+        case KC_6:             return SendKey(KC_6, outbuf);
     }
     // all other keys
     return mapNormalKeyToCurrentLayout(inbuf, i, outbuf);
@@ -560,40 +565,40 @@ ControlCode AltTab_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
     // map any key
     if (i >= 2) switch (inbuf[i]) {
         // Tilde
-        case _Backtick:      return SendKey(_Backtick, outbuf);
+        case KC_Backtick:      return SendKey(KC_Backtick, outbuf);
         // Tab
-        case _Tab:           return SendKey(_Tab, outbuf);
-        case _Backslash:     return SendKey(_Tab, outbuf);
+        case KC_Tab:           return SendKey(KC_Tab, outbuf);
+        case KC_Backslash:     return SendKey(KC_Tab, outbuf);
         // Shift
-        case _Q:             return SendModifiers(LShift, outbuf);
-        case _P:             return SendModifiers(RShift, outbuf);
+        case KC_Q:             return SendModifiers(LShift, outbuf);
+        case KC_P:             return SendModifiers(RShift, outbuf);
         // Escape
-        case _Escape:        return SendKey(_Escape, outbuf);
-        case _Y:             return SendKey(_Escape, outbuf);
+        case KC_Escape:        return SendKey(KC_Escape, outbuf);
+        case KC_Y:             return SendKey(KC_Escape, outbuf);
         // arrow keys
-        case _Left:          return SendKey(_Left, outbuf);
-        case _Up:            return SendKey(_Up, outbuf);
-        case _Down:          return SendKey(_Down, outbuf);
-        case _Right:         return SendKey(_Right, outbuf);
-        case _J:             return SendKey(_Left, outbuf);
-        case _K:             return SendKey(_Up, outbuf);
-        case _L:             return SendKey(_Down, outbuf);
-        case _Semicolon:     return SendKey(_Right, outbuf);
+        case KC_Left:          return SendKey(KC_Left, outbuf);
+        case KC_Up:            return SendKey(KC_Up, outbuf);
+        case KC_Down:          return SendKey(KC_Down, outbuf);
+        case KC_Right:         return SendKey(KC_Right, outbuf);
+        case KC_J:             return SendKey(KC_Left, outbuf);
+        case KC_K:             return SendKey(KC_Up, outbuf);
+        case KC_L:             return SendKey(KC_Down, outbuf);
+        case KC_Semicolon:     return SendKey(KC_Right, outbuf);
     }
     // all other keys
     return InvalidKey();
 }
 
 ControlCode WindowSnap_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
-    // exit condition: first key pressed is no longer _C
-    if (inbuf[2] != _C) return EnterMode(LeftAltMode, Used);
+    // exit condition: first key pressed is no longer KC_C
+    if (inbuf[2] != KC_C) return EnterMode(LeftAltMode, Used);
 
     // map modifier
     if (i == 0) switch (inbuf[i]) {
         case LAlt:         return Continue;
     }
     // map first key
-    if (i == 2) switch (inbuf[i]) { // must be _C because of exit guard
+    if (i == 2) switch (inbuf[i]) { // must be KC_C because of exit guard
         default:           return SendModifiers(WindowSnapModifierKeycode(), outbuf);
     }
     // all other keys
@@ -601,8 +606,8 @@ ControlCode WindowSnap_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
 }
 
 ControlCode NumPad_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
-    // exit condition: first key pressed is no longer _X
-    if (inbuf[2] != _X)             return EnterMode(LeftAltMode, Used);
+    // exit condition: first key pressed is no longer KC_X
+    if (inbuf[2] != KC_X)             return EnterMode(LeftAltMode, Used);
 
     // map modifier
     if (i == 0) switch (inbuf[i]) {
@@ -610,37 +615,37 @@ ControlCode NumPad_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
         default:                    return mapNormalKeyToCurrentLayout(inbuf, i, outbuf);
     }
     // map first key
-    if (i == 2) switch (inbuf[i]) { // must be _X because of exit guard
+    if (i == 2) switch (inbuf[i]) { // must be KC_X because of exit guard
         default:                    return Continue;
     }
     // map subsequent keys
     if (i > 2)  switch (inbuf[i]) {
-        case _7:                    return SendKey(_Numpad7, outbuf);
-        case _8:                    return SendKey(_Numpad8, outbuf);
-        case _9:                    return SendKey(_Numpad9, outbuf);
-        case _0:                    return SendKey(_NumpadTimes, outbuf);
-        case _Dash:                 return SendKey(_VolumeDown, outbuf);
-        case _Equals:               return SendKey(_VolumeUp, outbuf);
-        case _U:                    return SendKey(_Numpad4, outbuf);
-        case _I:                    return SendKey(_Numpad5, outbuf);
-        case _O:                    return SendKey(_Numpad6, outbuf);
-        case _P:                    return SendKey(_NumpadMinus, outbuf);
-        case _LeftBracket:          return SendKey(_NumpadEnter, outbuf);
-        case _RightBracket:         return SendKey(_NumLock, outbuf);
-        case _Backslash:            return SendKey(_NumLock, outbuf);
-        case _H:                    return SendKey(_Backspace, outbuf);
-        case _J:                    return SendKey(_Numpad1, outbuf);
-        case _K:                    return SendKey(_Numpad2, outbuf);
-        case _L:                    return SendKey(_Numpad3, outbuf);
-        case _Semicolon:            return SendKey(_NumpadPlus, outbuf);
-        case _Apostrophe:           return SendKeyCombo(LShift, _Dash, outbuf); // Underscore
-        case _N:                    return SendKeyCombo(LShift, _Semicolon, outbuf); // Colon
-        case _M:                    return SendKey(_Numpad0, outbuf);
-        case _Comma:                return SendKey(_Comma, outbuf);
-        case _Fullstop:             return SendKey(_NumpadDot, outbuf);
-        case _ForwardSlash:         return SendKey(_NumpadDivide, outbuf);
-        case _Space:                return SendKey(_Space, outbuf);
-        case _Enter:                return SendKey(_Enter, outbuf);
+        case KC_7:                    return SendKey(KC_Numpad7, outbuf);
+        case KC_8:                    return SendKey(KC_Numpad8, outbuf);
+        case KC_9:                    return SendKey(KC_Numpad9, outbuf);
+        case KC_0:                    return SendKey(KC_NumpadTimes, outbuf);
+        case KC_Dash:                 return SendKey(KC_VolumeDown, outbuf);
+        case KC_Equals:               return SendKey(KC_VolumeUp, outbuf);
+        case KC_U:                    return SendKey(KC_Numpad4, outbuf);
+        case KC_I:                    return SendKey(KC_Numpad5, outbuf);
+        case KC_O:                    return SendKey(KC_Numpad6, outbuf);
+        case KC_P:                    return SendKey(KC_NumpadMinus, outbuf);
+        case KC_LeftBracket:          return SendKey(KC_NumpadEnter, outbuf);
+        case KC_RightBracket:         return SendKey(KC_NumLock, outbuf);
+        case KC_Backslash:            return SendKey(KC_NumLock, outbuf);
+        case KC_H:                    return SendKey(KC_Backspace, outbuf);
+        case KC_J:                    return SendKey(KC_Numpad1, outbuf);
+        case KC_K:                    return SendKey(KC_Numpad2, outbuf);
+        case KC_L:                    return SendKey(KC_Numpad3, outbuf);
+        case KC_Semicolon:            return SendKey(KC_NumpadPlus, outbuf);
+        case KC_Apostrophe:           return SendKeyCombo(LShift, KC_Dash, outbuf); // Underscore
+        case KC_N:                    return SendKeyCombo(LShift, KC_Semicolon, outbuf); // Colon
+        case KC_M:                    return SendKey(KC_Numpad0, outbuf);
+        case KC_Comma:                return SendKey(KC_Comma, outbuf);
+        case KC_Fullstop:             return SendKey(KC_NumpadDot, outbuf);
+        case KC_ForwardSlash:         return SendKey(KC_NumpadDivide, outbuf);
+        case KC_Space:                return SendKey(KC_Space, outbuf);
+        case KC_Enter:                return SendKey(KC_Enter, outbuf);
     }
     // all other keys
     return InvalidKey();
@@ -653,33 +658,33 @@ ControlCode GamingEntryPoint_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[
     if (i == 0) switch (inbuf[i]) {
         case LShift:      return EnterMode(GamingShiftMode, Clean);
         case LCtrl:       return EnterMode(GamingCtrlMode, Clean);
-        case LGui:        return SendKey(_Backspace, outbuf);
+        case LGui:        return SendKey(KC_Backspace, outbuf);
         case LAlt:        return EnterMode(GamingAltMode, Clean);
         case RCtrl:       return EnterMode(RightCtrlMode, Clean);
         default:          return Stop;
     }
     // map first key
     if (i == 2) switch (inbuf[i]) {
-        case _Escape:     return EnterMode(EscapeMode, Clean);
+        case KC_Escape:     return EnterMode(EscapeMode, Clean);
         // LH function keys ==> RH function keys
-        case _F1:             return SendKey(_F7, outbuf);
-        case _F2:             return SendKey(_F8, outbuf);
-        case _F3:             return SendKey(_F9, outbuf);
-        case _F4:             return SendKey(_F10, outbuf);
-        case _F5:             return SendKey(_F11, outbuf);
-        case _F6:             return SendKey(_F12, outbuf);
+        case KC_F1:             return SendKey(KC_F7, outbuf);
+        case KC_F2:             return SendKey(KC_F8, outbuf);
+        case KC_F3:             return SendKey(KC_F9, outbuf);
+        case KC_F4:             return SendKey(KC_F10, outbuf);
+        case KC_F5:             return SendKey(KC_F11, outbuf);
+        case KC_F6:             return SendKey(KC_F12, outbuf);
         // LH numbers ==> LH function keys
-        case _1:          return SendKey(_F1, outbuf);
-        case _2:          return SendKey(_F2, outbuf);
-        case _3:          return SendKey(_F3, outbuf);
-        case _4:          return SendKey(_F4, outbuf);
-        case _5:          return SendKey(_F5, outbuf);
-        case _6:          return SendKey(_F6, outbuf);
+        case KC_1:          return SendKey(KC_F1, outbuf);
+        case KC_2:          return SendKey(KC_F2, outbuf);
+        case KC_3:          return SendKey(KC_F3, outbuf);
+        case KC_4:          return SendKey(KC_F4, outbuf);
+        case KC_5:          return SendKey(KC_F5, outbuf);
+        case KC_6:          return SendKey(KC_F6, outbuf);
         // custom modifiers
-        case _Backtick:   return EnterMode(GamingBacktickMode, Clean);
-        case _Tab:        return EnterMode(GamingTabMode, Clean);
-        case _CapsLock:   return EnterMode(GamingCapsLockMode, Clean);
-        case _Space:      return EnterMode(GamingSpaceMode, Clean);
+        case KC_Backtick:   return EnterMode(GamingBacktickMode, Clean);
+        case KC_Tab:        return EnterMode(GamingTabMode, Clean);
+        case KC_CapsLock:   return EnterMode(GamingCapsLockMode, Clean);
+        case KC_Space:      return EnterMode(GamingSpaceMode, Clean);
     }
     // all other keys
     return mapNormalKeyToCurrentLayout(inbuf, i, outbuf);
@@ -692,15 +697,15 @@ ControlCode GamingBacktick_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]
     }
     // map any key
     if (i >= 2) switch (inbuf[i]) {
-        case _Backtick:      return Continue;
-        case _Space:         return SendModifiers(LShift, outbuf);
+        case KC_Backtick:      return Continue;
+        case KC_Space:         return SendModifiers(LShift, outbuf);
         // backtick + row0 number ==> ctrl + LH function key
-        case _1:             return SendKeyCombo(LCtrl, _F1, outbuf);
-        case _2:             return SendKeyCombo(LCtrl, _F2, outbuf);
-        case _3:             return SendKeyCombo(LCtrl, _F3, outbuf);
-        case _4:             return SendKeyCombo(LCtrl, _F4, outbuf);
-        case _5:             return SendKeyCombo(LCtrl, _F5, outbuf);
-        case _6:             return SendKeyCombo(LCtrl, _F6, outbuf);
+        case KC_1:             return SendKeyCombo(LCtrl, KC_F1, outbuf);
+        case KC_2:             return SendKeyCombo(LCtrl, KC_F2, outbuf);
+        case KC_3:             return SendKeyCombo(LCtrl, KC_F3, outbuf);
+        case KC_4:             return SendKeyCombo(LCtrl, KC_F4, outbuf);
+        case KC_5:             return SendKeyCombo(LCtrl, KC_F5, outbuf);
+        case KC_6:             return SendKeyCombo(LCtrl, KC_F6, outbuf);
     }
     // all other keys
     return InvalidKey();
@@ -713,20 +718,20 @@ ControlCode GamingTab_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
     }
     // map any key
     if (i >= 2) switch (inbuf[i]){
-        case _Tab:           return Continue;
-        case _Space:         return SendModifiers(LShift, outbuf);
+        case KC_Tab:           return Continue;
+        case KC_Space:         return SendModifiers(LShift, outbuf);
         // Tab + row1 letter ==> Alt + LH number
-        case _Q:             return SendKeyCombo(LAlt, _1, outbuf);
-        case _W:             return SendKeyCombo(LAlt, _2, outbuf);
-        case _E:             return SendKeyCombo(LAlt, _3, outbuf);
-        case _R:             return SendKeyCombo(LAlt, _4, outbuf);
-        case _T:             return SendKeyCombo(LAlt, _5, outbuf);
+        case KC_Q:             return SendKeyCombo(LAlt, KC_1, outbuf);
+        case KC_W:             return SendKeyCombo(LAlt, KC_2, outbuf);
+        case KC_E:             return SendKeyCombo(LAlt, KC_3, outbuf);
+        case KC_R:             return SendKeyCombo(LAlt, KC_4, outbuf);
+        case KC_T:             return SendKeyCombo(LAlt, KC_5, outbuf);
         // Tab + row2 letter ==> Alt + RH number
-        case _A:             return SendKeyCombo(LAlt, _6, outbuf);
-        case _S:             return SendKeyCombo(LAlt, _7, outbuf);
-        case _D:             return SendKeyCombo(LAlt, _8, outbuf);
-        case _F:             return SendKeyCombo(LAlt, _9, outbuf);
-        case _G:             return SendKeyCombo(LAlt, _0, outbuf);
+        case KC_A:             return SendKeyCombo(LAlt, KC_6, outbuf);
+        case KC_S:             return SendKeyCombo(LAlt, KC_7, outbuf);
+        case KC_D:             return SendKeyCombo(LAlt, KC_8, outbuf);
+        case KC_F:             return SendKeyCombo(LAlt, KC_9, outbuf);
+        case KC_G:             return SendKeyCombo(LAlt, KC_0, outbuf);
     }
     // all other keys
     return InvalidKey();
@@ -739,20 +744,20 @@ ControlCode GamingCapsLock_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]
     }
     // map any key
     if (i >= 2) switch (inbuf[i]){
-        case _CapsLock:      return SendModifiers(LCtrl, outbuf);
-        case _Space:         return SendModifiers(LShift, outbuf);
+        case KC_CapsLock:      return SendModifiers(LCtrl, outbuf);
+        case KC_Space:         return SendModifiers(LShift, outbuf);
         // CapsLock + row1 letter ==> Ctrl + LH number
-        case _Q:             return SendKeyCombo(LCtrl, _1, outbuf);
-        case _W:             return SendKeyCombo(LCtrl, _2, outbuf);
-        case _E:             return SendKeyCombo(LCtrl, _3, outbuf);
-        case _R:             return SendKeyCombo(LCtrl, _4, outbuf);
-        case _T:             return SendKeyCombo(LCtrl, _5, outbuf);
+        case KC_Q:             return SendKeyCombo(LCtrl, KC_1, outbuf);
+        case KC_W:             return SendKeyCombo(LCtrl, KC_2, outbuf);
+        case KC_E:             return SendKeyCombo(LCtrl, KC_3, outbuf);
+        case KC_R:             return SendKeyCombo(LCtrl, KC_4, outbuf);
+        case KC_T:             return SendKeyCombo(LCtrl, KC_5, outbuf);
         // Capslock + row2 letter => Ctrl + RH number
-        case _A:             return SendKeyCombo(LCtrl, _6, outbuf);
-        case _S:             return SendKeyCombo(LCtrl, _7, outbuf);
-        case _D:             return SendKeyCombo(LCtrl, _8, outbuf);
-        case _F:             return SendKeyCombo(LCtrl, _9, outbuf);
-        case _G:             return SendKeyCombo(LCtrl, _0, outbuf);
+        case KC_A:             return SendKeyCombo(LCtrl, KC_6, outbuf);
+        case KC_S:             return SendKeyCombo(LCtrl, KC_7, outbuf);
+        case KC_D:             return SendKeyCombo(LCtrl, KC_8, outbuf);
+        case KC_F:             return SendKeyCombo(LCtrl, KC_9, outbuf);
+        case KC_G:             return SendKeyCombo(LCtrl, KC_0, outbuf);
     }
     // all other keys
     return InvalidKey();
@@ -763,7 +768,7 @@ ControlCode GamingShift_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
     if (i == 0) {
         uint8_t key = 0;
         if (inbuf[i] & LGui) {
-            key = _Backspace;
+            key = KC_Backspace;
         }
 
         uint8_t mods = inbuf[i] & ~LGui;
@@ -772,19 +777,19 @@ ControlCode GamingShift_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
     }
     // map first key
     if (i == 2) switch (inbuf[i]) {
-        case _CapsLock:   return EnterMode(GamingCapsLockMode, Clean);
+        case KC_CapsLock:   return EnterMode(GamingCapsLockMode, Clean);
         // Shift + row1 letter ==> Shift + LH number
-        case _Q:             return SendKey(_1, outbuf);
-        case _W:             return SendKey(_2, outbuf);
-        case _E:             return SendKey(_3, outbuf);
-        case _R:             return SendKey(_4, outbuf);
-        case _T:             return SendKey(_5, outbuf);
+        case KC_Q:             return SendKey(KC_1, outbuf);
+        case KC_W:             return SendKey(KC_2, outbuf);
+        case KC_E:             return SendKey(KC_3, outbuf);
+        case KC_R:             return SendKey(KC_4, outbuf);
+        case KC_T:             return SendKey(KC_5, outbuf);
         // Shift + row2 letter ==> Shift + RH number
-        case _A:             return SendKey(_6, outbuf);
-        case _S:             return SendKey(_7, outbuf);
-        case _D:             return SendKey(_8, outbuf);
-        case _F:             return SendKey(_9, outbuf);
-        case _G:             return SendKey(_0, outbuf);
+        case KC_A:             return SendKey(KC_6, outbuf);
+        case KC_S:             return SendKey(KC_7, outbuf);
+        case KC_D:             return SendKey(KC_8, outbuf);
+        case KC_F:             return SendKey(KC_9, outbuf);
+        case KC_G:             return SendKey(KC_0, outbuf);
     }
     // all other keys
     return mapNormalKeyToCurrentLayout(inbuf, i, outbuf);
@@ -799,7 +804,7 @@ ControlCode GamingCtrl_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
 
         uint8_t key = 0;
         if (inbuf[i] & LGui) {
-            key = _Backspace;
+            key = KC_Backspace;
         }
 
         uint8_t mods = inbuf[i] & ~LGui;
@@ -812,6 +817,7 @@ ControlCode GamingCtrl_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
         uint8_t key = inbuf[i];
         return SendKeyCombo(mods, key, outbuf);
     }
+    return Continue; // i == 1 (reserved byte): nothing to map
 }
 
 ControlCode GamingAlt_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
@@ -819,7 +825,7 @@ ControlCode GamingAlt_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
     if (i == 0) {
         uint8_t key = 0;
         if (inbuf[i] & LGui) {
-            key = _Backspace;
+            key = KC_Backspace;
         }
 
         uint8_t mods = inbuf[i] & ~LGui & ~LAlt;
@@ -828,27 +834,27 @@ ControlCode GamingAlt_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
     }
     // map any key
     if (i >= 2) switch (inbuf[i]){
-        case _Backtick:      return EnterMode(AltTabMode, Used);
-        case _Tab:           return EnterMode(AltTabMode, Used);
-        case _CapsLock:      return SendModifiers(LCtrl, outbuf);
+        case KC_Backtick:      return EnterMode(AltTabMode, Used);
+        case KC_Tab:           return EnterMode(AltTabMode, Used);
+        case KC_CapsLock:      return SendModifiers(LCtrl, outbuf);
         // Space + R1,R2 letter keys ==> navigation keys
-        case _Q:             return SendKey(_Home, outbuf);
-        case _W:             return SendKey(_PgUp, outbuf);
-        case _E:             return SendKey(_Up, outbuf);
-        case _R:             return SendKey(_PgDn, outbuf);
-        case _T:             return SendKey(_End, outbuf);
+        case KC_Q:             return SendKey(KC_Home, outbuf);
+        case KC_W:             return SendKey(KC_PgUp, outbuf);
+        case KC_E:             return SendKey(KC_Up, outbuf);
+        case KC_R:             return SendKey(KC_PgDn, outbuf);
+        case KC_T:             return SendKey(KC_End, outbuf);
 
-        case _A:             return SendKey(_Backspace, outbuf);
-        case _S:             return SendKey(_Left, outbuf);
-        case _D:             return SendKey(_Down, outbuf);
-        case _F:             return SendKey(_Right, outbuf);
-        case _G:             return SendKey(_Space, outbuf);
+        case KC_A:             return SendKey(KC_Backspace, outbuf);
+        case KC_S:             return SendKey(KC_Left, outbuf);
+        case KC_D:             return SendKey(KC_Down, outbuf);
+        case KC_F:             return SendKey(KC_Right, outbuf);
+        case KC_G:             return SendKey(KC_Space, outbuf);
         // Space + R3 letter keys ==> misc extras
-        case _Z:             return SendKey(_Insert, outbuf);
-        case _X:             return SendKey(_Backslash, outbuf);
-        case _C:             return SendKey(_Delete, outbuf);
-        case _V:             return SendKey(_LeftBracket, outbuf);
-        case _B:             return SendKey(_RightBracket, outbuf);
+        case KC_Z:             return SendKey(KC_Insert, outbuf);
+        case KC_X:             return SendKey(KC_Backslash, outbuf);
+        case KC_C:             return SendKey(KC_Delete, outbuf);
+        case KC_V:             return SendKey(KC_LeftBracket, outbuf);
+        case KC_B:             return SendKey(KC_RightBracket, outbuf);
     }
     // all other keys
     return InvalidKey();
@@ -861,35 +867,35 @@ ControlCode GamingSpace_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
     }
     // map any key
     if (i >= 2) switch (inbuf[i]){
-        case _Space:         return Continue;
-        case _Backtick:      return EnterMode(GamingBacktickMode, Used);
-        case _Tab:           return EnterMode(GamingTabMode, Used);
-        case _CapsLock:      return EnterMode(GamingCapsLockMode, Used);
+        case KC_Space:         return Continue;
+        case KC_Backtick:      return EnterMode(GamingBacktickMode, Used);
+        case KC_Tab:           return EnterMode(GamingTabMode, Used);
+        case KC_CapsLock:      return EnterMode(GamingCapsLockMode, Used);
          // Space + row0 number ==> ctrl + LH function key
-        case _1:             return SendKeyCombo(LCtrl, _F1, outbuf);
-        case _2:             return SendKeyCombo(LCtrl, _F2, outbuf);
-        case _3:             return SendKeyCombo(LCtrl, _F3, outbuf);
-        case _4:             return SendKeyCombo(LCtrl, _F4, outbuf);
-        case _5:             return SendKeyCombo(LCtrl, _F5, outbuf);
-        case _6:             return SendKeyCombo(LCtrl, _F6, outbuf);
+        case KC_1:             return SendKeyCombo(LCtrl, KC_F1, outbuf);
+        case KC_2:             return SendKeyCombo(LCtrl, KC_F2, outbuf);
+        case KC_3:             return SendKeyCombo(LCtrl, KC_F3, outbuf);
+        case KC_4:             return SendKeyCombo(LCtrl, KC_F4, outbuf);
+        case KC_5:             return SendKeyCombo(LCtrl, KC_F5, outbuf);
+        case KC_6:             return SendKeyCombo(LCtrl, KC_F6, outbuf);
         // Space + R1 letter keys ==> LH number
-        case _Q:             return SendKey(_1, outbuf);
-        case _W:             return SendKey(_2, outbuf);
-        case _E:             return SendKey(_3, outbuf);
-        case _R:             return SendKey(_4, outbuf);
-        case _T:             return SendKey(_5, outbuf);
+        case KC_Q:             return SendKey(KC_1, outbuf);
+        case KC_W:             return SendKey(KC_2, outbuf);
+        case KC_E:             return SendKey(KC_3, outbuf);
+        case KC_R:             return SendKey(KC_4, outbuf);
+        case KC_T:             return SendKey(KC_5, outbuf);
         // Space + R2 letter keys ==> RH number
-        case _A:             return SendKey(_6, outbuf);
-        case _S:             return SendKey(_7, outbuf);
-        case _D:             return SendKey(_8, outbuf);
-        case _F:             return SendKey(_9, outbuf);
-        case _G:             return SendKey(_0, outbuf);
+        case KC_A:             return SendKey(KC_6, outbuf);
+        case KC_S:             return SendKey(KC_7, outbuf);
+        case KC_D:             return SendKey(KC_8, outbuf);
+        case KC_F:             return SendKey(KC_9, outbuf);
+        case KC_G:             return SendKey(KC_0, outbuf);
         // Space + R3 letter keys ==> misc extras
-        case _Z:             return SendOnlyKey(_NumpadMinus, outbuf);
-        case _X:             return SendOnlyKey(_NumpadPlus, outbuf);
-        case _C:             return SendOnlyKey(_Pause, outbuf);
-        case _V:             return SendOnlyKey(_Pause, outbuf);
-        case _B:             return SendOnlyKey(_Pause, outbuf);
+        case KC_Z:             return SendOnlyKey(KC_NumpadMinus, outbuf);
+        case KC_X:             return SendOnlyKey(KC_NumpadPlus, outbuf);
+        case KC_C:             return SendOnlyKey(KC_Pause, outbuf);
+        case KC_V:             return SendOnlyKey(KC_Pause, outbuf);
+        case KC_B:             return SendOnlyKey(KC_Pause, outbuf);
     }
     // all other keys
     return InvalidKey();
@@ -901,33 +907,33 @@ ControlCode GamingSpace_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
 ControlCode BlackDesertEntryPoint_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]) {
     // map modifier
     if (i == 0) switch (inbuf[i]) {
-        case LCtrl:       return SendKey(_Escape, outbuf);
-        case LGui:        return SendKey(_Enter, outbuf);
+        case LCtrl:       return SendKey(KC_Escape, outbuf);
+        case LGui:        return SendKey(KC_Enter, outbuf);
         case LAlt:        return EnterMode(BlackDesertAltMode, Clean);
         case RCtrl:       return EnterMode(RightCtrlMode, Clean);
         default:          return EnterMode(NormalTypingMode, Used);
     }
     // map first key
     if (i == 2) switch (inbuf[i]) {
-        case _Escape:     return EnterMode(EscapeMode, Clean);
+        case KC_Escape:     return EnterMode(EscapeMode, Clean);
         // LH function keys ==> RH function keys
-        case _F1:             return SendKey(_F7, outbuf);
-        case _F2:             return SendKey(_F8, outbuf);
-        case _F3:             return SendKey(_F9, outbuf);
-        case _F4:             return SendKey(_F10, outbuf);
-        case _F5:             return SendKey(_F11, outbuf);
-        case _F6:             return SendKey(_F12, outbuf);
+        case KC_F1:             return SendKey(KC_F7, outbuf);
+        case KC_F2:             return SendKey(KC_F8, outbuf);
+        case KC_F3:             return SendKey(KC_F9, outbuf);
+        case KC_F4:             return SendKey(KC_F10, outbuf);
+        case KC_F5:             return SendKey(KC_F11, outbuf);
+        case KC_F6:             return SendKey(KC_F12, outbuf);
         // LH numbers ==> LH function keys
-        case _Backtick:   return SendKey(_Insert, outbuf);
-        case _1:          return SendKey(_F1, outbuf);
-        case _2:          return SendKey(_F2, outbuf);
-        case _3:          return SendKey(_F3, outbuf);
-        case _4:          return SendKey(_F4, outbuf);
-        case _5:          return SendKey(_F5, outbuf);
-        case _6:          return SendKey(_F6, outbuf);
+        case KC_Backtick:   return SendKey(KC_Insert, outbuf);
+        case KC_1:          return SendKey(KC_F1, outbuf);
+        case KC_2:          return SendKey(KC_F2, outbuf);
+        case KC_3:          return SendKey(KC_F3, outbuf);
+        case KC_4:          return SendKey(KC_F4, outbuf);
+        case KC_5:          return SendKey(KC_F5, outbuf);
+        case KC_6:          return SendKey(KC_F6, outbuf);
         // custom modifiers
-        case _CapsLock:   return EnterMode(BlackDesertCapsLockMode, Clean);
-        case _Space:      return EnterMode(BlackDesertSpaceMode, Clean);
+        case KC_CapsLock:   return EnterMode(BlackDesertCapsLockMode, Clean);
+        case KC_Space:      return EnterMode(BlackDesertSpaceMode, Clean);
     }
     // all other keys
     return mapNormalKeyToCurrentLayout(inbuf, i, outbuf);
@@ -940,26 +946,26 @@ ControlCode BlackDesertCapsLock_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outb
     }
     // map any key
     if (i >= 2) switch (inbuf[i]){
-        case _CapsLock:      return Continue;
-        case _Space:         return SendModifiers(LCtrl, outbuf);
+        case KC_CapsLock:      return Continue;
+        case KC_Space:         return SendModifiers(LCtrl, outbuf);
         // CapsLock + R1 letter keys ==> LH number
-        case _Q:             return SendKey(_P, outbuf);
-        case _W:             return SendKey(_O, outbuf);
-        case _E:             return SendKey(_I, outbuf);
-        case _R:             return SendKey(_U, outbuf);
-        case _T:             return SendKey(_Y, outbuf);
+        case KC_Q:             return SendKey(KC_P, outbuf);
+        case KC_W:             return SendKey(KC_O, outbuf);
+        case KC_E:             return SendKey(KC_I, outbuf);
+        case KC_R:             return SendKey(KC_U, outbuf);
+        case KC_T:             return SendKey(KC_Y, outbuf);
         // CapsLock + R2 letter keys ==> RH number
-        case _A:             return SendKey(_Semicolon, outbuf);
-        case _S:             return SendKey(_L, outbuf);
-        case _D:             return SendKey(_K, outbuf);
-        case _F:             return SendKey(_J, outbuf);
-        case _G:             return SendKey(_H, outbuf);
+        case KC_A:             return SendKey(KC_Semicolon, outbuf);
+        case KC_S:             return SendKey(KC_L, outbuf);
+        case KC_D:             return SendKey(KC_K, outbuf);
+        case KC_F:             return SendKey(KC_J, outbuf);
+        case KC_G:             return SendKey(KC_H, outbuf);
         // CapsLock + R3 letter keys ==> misc extras
-        case _Z:             return SendKey(_Fullstop, outbuf);
-        case _X:             return SendKey(_Comma, outbuf);
-        case _C:             return SendKey(_M, outbuf);
-        case _V:             return SendKey(_N, outbuf);
-        case _B:             return SendKey(_B, outbuf);
+        case KC_Z:             return SendKey(KC_Fullstop, outbuf);
+        case KC_X:             return SendKey(KC_Comma, outbuf);
+        case KC_C:             return SendKey(KC_M, outbuf);
+        case KC_V:             return SendKey(KC_N, outbuf);
+        case KC_B:             return SendKey(KC_B, outbuf);
     }
     // all other keys
     return InvalidKey();
@@ -972,32 +978,32 @@ ControlCode BlackDesertSpace_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[
     }
     // map any key
     if (i >= 2) switch (inbuf[i]){
-        case _Space:         return Continue;
+        case KC_Space:         return Continue;
          // Space + row0 number ==> ctrl + LH function key
-        case _1:             return SendKey(_F7, outbuf);
-        case _2:             return SendKey(_F8, outbuf);
-        case _3:             return SendKey(_F9, outbuf);
-        case _4:             return SendKey(_F10, outbuf);
-        case _5:             return SendKey(_F11, outbuf);
-        case _6:             return SendKey(_F12, outbuf);
+        case KC_1:             return SendKey(KC_F7, outbuf);
+        case KC_2:             return SendKey(KC_F8, outbuf);
+        case KC_3:             return SendKey(KC_F9, outbuf);
+        case KC_4:             return SendKey(KC_F10, outbuf);
+        case KC_5:             return SendKey(KC_F11, outbuf);
+        case KC_6:             return SendKey(KC_F12, outbuf);
         // Space + R1 letter keys ==> LH number
-        case _Q:             return SendKey(_1, outbuf);
-        case _W:             return SendKey(_2, outbuf);
-        case _E:             return SendKey(_3, outbuf);
-        case _R:             return SendKey(_4, outbuf);
-        case _T:             return SendKey(_5, outbuf);
+        case KC_Q:             return SendKey(KC_1, outbuf);
+        case KC_W:             return SendKey(KC_2, outbuf);
+        case KC_E:             return SendKey(KC_3, outbuf);
+        case KC_R:             return SendKey(KC_4, outbuf);
+        case KC_T:             return SendKey(KC_5, outbuf);
         // Space + R2 letter keys ==> RH number
-        case _A:             return SendKey(_6, outbuf);
-        case _S:             return SendKey(_7, outbuf);
-        case _D:             return SendKey(_8, outbuf);
-        case _F:             return SendKey(_9, outbuf);
-        case _G:             return SendKey(_0, outbuf);
+        case KC_A:             return SendKey(KC_6, outbuf);
+        case KC_S:             return SendKey(KC_7, outbuf);
+        case KC_D:             return SendKey(KC_8, outbuf);
+        case KC_F:             return SendKey(KC_9, outbuf);
+        case KC_G:             return SendKey(KC_0, outbuf);
         // Space + R3 letter keys ==> misc extras
-        case _Z:             return SendOnlyKey(_Left, outbuf);
-        case _X:             return SendOnlyKey(_Up, outbuf);
-        case _C:             return SendOnlyKey(_Down, outbuf);
-        case _V:             return SendOnlyKey(_Right, outbuf);
-        case _B:             return SendOnlyKey(_CapsLock, outbuf);
+        case KC_Z:             return SendOnlyKey(KC_Left, outbuf);
+        case KC_X:             return SendOnlyKey(KC_Up, outbuf);
+        case KC_C:             return SendOnlyKey(KC_Down, outbuf);
+        case KC_V:             return SendOnlyKey(KC_Right, outbuf);
+        case KC_B:             return SendOnlyKey(KC_CapsLock, outbuf);
     }
     // all other keys
     return InvalidKey();
@@ -1010,8 +1016,8 @@ ControlCode BlackDesertAlt_keymap(uint8_t inbuf[8], uint8_t i, uint8_t outbuf[8]
     }
     // map any key
     if (i >= 2) switch (inbuf[i]){
-        case _Backtick:      return EnterMode(AltTabMode, Used);
-        case _Tab:           return EnterMode(AltTabMode, Used);
+        case KC_Backtick:      return EnterMode(AltTabMode, Used);
+        case KC_Tab:           return EnterMode(AltTabMode, Used);
     }
     // all other keys
     return EnterMode(NormalTypingMode, Used);
@@ -1025,10 +1031,10 @@ void HandleLastKeyReleased() {
     // send normalTypingMode keys on release of custom modifier if no other keys were pressed while it was held down
     if (CurrentModeState == Clean) switch (CurrentMode) {
         case EscapeMode: // send Escape on release
-            PressAndReleaseKey((RichKey){ 0, _Escape } );
+            PressAndReleaseKey((RichKey){ 0, KC_Escape } );
             break;
         case CapsLockMode: // send Escape on release
-            PressAndReleaseKey((RichKey){ 0, _Escape } );
+            PressAndReleaseKey((RichKey){ 0, KC_Escape } );
             break;
         case RightCtrlMode: // send RCtrl on releasecase RightCtrlMode: // send RCtrl on release
             PressAndReleaseKey((RichKey){ RCtrl, 0 } );
@@ -1040,25 +1046,25 @@ void HandleLastKeyReleased() {
             PressAndReleaseKey((RichKey){ RAlt, 0 } );
             break;
         case GamingBacktickMode: // send Backtick on release
-            PressAndReleaseKey((RichKey){ 0, _Backtick } );
+            PressAndReleaseKey((RichKey){ 0, KC_Backtick } );
             break;
         case GamingTabMode: // send Tab on release
-            PressAndReleaseKey((RichKey){ 0, _Tab } );
+            PressAndReleaseKey((RichKey){ 0, KC_Tab } );
             break;
         case GamingCtrlMode: // send Escape on release
-            PressAndReleaseKey((RichKey){ 0, _Escape } );
+            PressAndReleaseKey((RichKey){ 0, KC_Escape } );
             break;
         case GamingAltMode: // send LAlt on release
             PressAndReleaseKey((RichKey){ LAlt, 0 } );
             break;
         case GamingSpaceMode: // send Space on release
-            PressAndReleaseKey((RichKey){ 0, _Space } );
+            PressAndReleaseKey((RichKey){ 0, KC_Space } );
             break;
         case BlackDesertCapsLockMode: // send Ctrl on release
             PressAndReleaseKey((RichKey){ LCtrl, 0 } );
             break;
         case BlackDesertSpaceMode: // send Space on release
-            PressAndReleaseKey((RichKey){ 0, _Space } );
+            PressAndReleaseKey((RichKey){ 0, KC_Space } );
             break;
     }
     SetMode(EntryPointMode, Clean);
@@ -1165,6 +1171,7 @@ String GetOSModeString(OSMode osMode) {
         case Windows:    return "Win";
         case OSX:        return "OSX";
     }
+    return "<unknown>"; // unreachable; satisfies -Werror=return-type
 }
 
 String GetModeString(Mode mode) {
@@ -1208,6 +1215,7 @@ String GetLayoutString(KeyboardLayout layout) {
         case dvorak:    return "DV";
         // case dvorakProgrammer:   return "DVP";
     }
+    return "<unknown>"; // unreachable; satisfies -Werror=return-type
 }
 
 // ****************************************************************************
