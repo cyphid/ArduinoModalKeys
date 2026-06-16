@@ -41,6 +41,21 @@
 #endif
 #endif
 
+// *******************************************************************************************
+// Forward declarations
+// *******************************************************************************************
+// These functions are called (notably from KbdRptParser::Parse) before they are
+// defined further down this file. The Arduino IDE normally auto-generates
+// prototypes, but it inserts them before the first *free* function -- which here
+// is preceded by the KbdRptParser::Parse member function that already calls
+// them. Declaring them explicitly keeps the sketch compiling across IDE versions.
+
+bool TransitionToState(uint8_t newbuf[8]);
+void SendState(uint8_t buf[8]);
+void PrintState(uint8_t inBuf[8], uint8_t outBuf[8], bool outputChanged);
+void PressKey(RichKey key);
+void SendKeysToHost(uint8_t buf[8]);
+
 
 // *******************************************************************************************
 // Forward declarations
